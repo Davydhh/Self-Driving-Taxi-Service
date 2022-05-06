@@ -1,7 +1,7 @@
-package REST.Client;
+package rest.Client;
 
-import REST.beans.User;
-import REST.beans.Users;
+import rest.beans.User;
+import rest.beans.Users;
 import com.google.gson.Gson;
 import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientHandlerException;

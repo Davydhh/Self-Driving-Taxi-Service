@@ -1,8 +1,8 @@
-package REST.services;
+package rest.services;
 
 
-import REST.beans.User;
-import REST.beans.Users;
+import rest.beans.User;
+import rest.beans.Users;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;

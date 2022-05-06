@@ -1,4 +1,4 @@
-package REST;
+package rest;
 
 import com.sun.jersey.api.container.httpserver.HttpServerFactory;
 import com.sun.net.httpserver.HttpServer;

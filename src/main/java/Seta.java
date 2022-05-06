@@ -1,14 +1,23 @@
-package mqtt;
+import model.RideRequest;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 
-import org.eclipse.paho.client.mqttv3.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
-public class PubExample {
+public class Seta {
+
     public static void main(String[] args) {
+        System.out.println("Starting SETA system...");
         MqttClient client;
         String broker = "tcp://localhost:1883";
         String clientId = MqttClient.generateClientId();
-        String topic = "home/sensors/light";
-        int qos = 2;
+        List<String> topics = Arrays.asList("seta/smartcity/rides/district1", "seta/smartcity/rides/district2", "seta" +
+                "/smartcity/rides/district3", "seta/smartcity/rides/district4");
+        int qos = 1;
 
         //brew services start mosquitto
 
@@ -16,10 +25,6 @@ public class PubExample {
             client = new MqttClient(broker, clientId);
             MqttConnectOptions connOpts = new MqttConnectOptions();
             connOpts.setCleanSession(true);
-            //connOpts.setUserName(username); // optional
-            //connOpts.setPassword(password.toCharArray()); // optional
-            //connOpts.setWill("this/is/a/topic","will message".getBytes(),1,false);  // optional
-            //connOpts.setKeepAliveInterval(60);  // optional
 
             // Connect the client
             System.out.println(clientId + " Connecting Broker " + broker);
@@ -38,9 +43,6 @@ public class PubExample {
             if (client.isConnected())
                 client.disconnect();
             System.out.println("Publisher " + clientId + " disconnected");
-
-
-
         } catch (MqttException me ) {
             System.out.println("reason " + me.getReasonCode());
             System.out.println("msg " + me.getMessage());
@@ -48,6 +50,13 @@ public class PubExample {
             System.out.println("cause " + me.getCause());
             System.out.println("excep " + me);
             me.printStackTrace();
+        }
+    }
+
+    private void generateRequests() throws InterruptedException {
+        while(true) {
+            RideRequest request = new RideRequest()
+            TimeUnit.SECONDS.sleep(5);
         }
     }
 }

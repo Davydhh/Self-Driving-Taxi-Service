@@ -1,4 +1,4 @@
-package REST.beans;
+package rest.beans;
 
 /**
  * Created by civi on 26/04/16.
