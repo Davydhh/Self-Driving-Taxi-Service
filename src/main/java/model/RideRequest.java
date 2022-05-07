@@ -1,15 +1,17 @@
 package model;
 
+import java.awt.*;
+
 public class RideRequest {
-    private final String id;
+    private final int id;
 
-    private final int[][] startPos;
+    private final Point startPos;
 
-    private final int[][] destPos;
+    private final Point endPoint;
 
-    public RideRequest(String id, int[][] startPos, int[][] destPos) {
+    public RideRequest(int id, Point startPos, Point endPoint) {
         this.id = id;
         this.startPos = startPos;
-        this.destPos = destPos;
+        this.endPoint = endPoint;
     }
 }
