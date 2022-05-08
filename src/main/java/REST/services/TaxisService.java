@@ -1,5 +1,6 @@
 package rest.services;
 
+import rest.beans.RegistrationResponse;
 import rest.beans.Taxi;
 import rest.beans.Taxis;
 
@@ -18,8 +19,10 @@ public class TaxisService {
     @POST
     @Consumes({"application/json", "application/xml"})
     public Response addTaxi(Taxi taxi){
-        if (Taxis.getInstance().add(taxi)) {
-            return Response.ok().build();
+        RegistrationResponse response = Taxis.getInstance().add(taxi);
+
+        if (response != null) {
+            return Response.ok(response).build();
         }
 
         return Response.status(Response.Status.FORBIDDEN).build();
