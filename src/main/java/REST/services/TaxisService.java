@@ -1,6 +1,5 @@
 package rest.services;
 
-import rest.beans.RegistrationResponse;
 import rest.beans.TaxiBean;
 import rest.beans.Taxis;
 
@@ -18,6 +17,7 @@ public class TaxisService {
 
     @POST
     @Consumes({"application/json", "application/xml"})
+    @Produces({"application/json", "application/xml"})
     public Response addTaxi(TaxiBean taxi){
         String response = Taxis.getInstance().add(taxi);
 

@@ -1,13 +1,17 @@
 package rest.beans;
 
 
+import javax.xml.bind.annotation.XmlRootElement;
 import java.awt.*;
 import java.util.List;
 
+@XmlRootElement
 public class RegistrationResponse {
-    private final Point starPos;
+    private Point starPos;
 
-    private final List<TaxiBean> taxis;
+    private List<TaxiBean> taxis;
+
+    public RegistrationResponse() {}
 
     public RegistrationResponse(Point starPos, List<TaxiBean> taxis) {
         this.starPos = starPos;
@@ -20,5 +24,13 @@ public class RegistrationResponse {
 
     public List<TaxiBean> getTaxis() {
         return taxis;
+    }
+
+    @Override
+    public String toString() {
+        return "RegistrationResponse{" +
+                "starPos=" + starPos +
+                ", taxis=" + taxis +
+                '}';
     }
 }

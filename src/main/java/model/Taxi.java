@@ -43,11 +43,13 @@ public class Taxi {
 
     private static String mqttClientId;
 
-    private static void register(TaxiBean taxiBean) {
-        ClientResponse response = postRequest(ip + "/taxis", taxiBean);
+    private static void register(TaxiBean taxiBean, String serverAddress) {
+        ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean);
         if (response != null && response.getStatus() == 200) {
             RegistrationResponse responseBody = new Gson().fromJson(response.getEntity(String.class),
                     RegistrationResponse.class);
+            System.out.println(responseBody);
+
             startPos = responseBody.getStarPos();
             otherTaxis = responseBody.getTaxis();
             //TODO: Acquiring Data from sensors
@@ -143,6 +145,6 @@ public class Taxi {
             System.out.println("The server address is invalid!");
             System.exit(0);
         }
-        register(new TaxiBean(id, port, ip));
+        register(new TaxiBean(id, port, ip), serverAddress);
     }
 }
