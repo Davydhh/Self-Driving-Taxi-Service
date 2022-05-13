@@ -7,9 +7,9 @@ import java.util.List;
 public class RegistrationResponse {
     private final Point starPos;
 
-    private final List<Taxi> taxis;
+    private final List<TaxiBean> taxis;
 
-    public RegistrationResponse(Point starPos, List<Taxi> taxis) {
+    public RegistrationResponse(Point starPos, List<TaxiBean> taxis) {
         this.starPos = starPos;
         this.taxis = taxis;
     }
@@ -18,7 +18,7 @@ public class RegistrationResponse {
         return starPos;
     }
 
-    public List<Taxi> getTaxis() {
+    public List<TaxiBean> getTaxis() {
         return taxis;
     }
 }

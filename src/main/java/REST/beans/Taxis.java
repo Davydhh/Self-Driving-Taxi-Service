@@ -1,28 +1,30 @@
 package rest.beans;
 
-import java.awt.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import com.google.gson.Gson;
 
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
+import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 @XmlRootElement
 @XmlAccessorType (XmlAccessType.FIELD)
 public class Taxis {
 
     @XmlElement
-    private final List<Taxi> taxis;
+    private final List<TaxiBean> taxis;
 
     private static Taxis instance;
 
-    private Random random;
+    private final Random random;
 
     private Taxis() {
         taxis = new ArrayList<>();
+        random = new Random();
     }
 
     public synchronized static Taxis getInstance(){
@@ -31,16 +33,18 @@ public class Taxis {
         return instance;
     }
 
-    public synchronized List<Taxi> getTaxis() {
+    public synchronized List<TaxiBean> getTaxis() {
         return new ArrayList<>(taxis);
     }
 
-    public synchronized RegistrationResponse add(Taxi u) {
+    public synchronized String add(TaxiBean u) {
         if (taxis.contains(u)) {
             return null;
         }
         taxis.add(u);
-        return new RegistrationResponse(generateStartingPoint(), getTaxis());
+        List<TaxiBean> otherTaxis = getTaxis();
+        otherTaxis.remove(u);
+        return new Gson().toJson(new RegistrationResponse(generateStartingPoint(), otherTaxis));
     }
 
     private Point generateStartingPoint() {
@@ -48,7 +52,7 @@ public class Taxis {
     }
 
     public synchronized boolean delete(int id) {
-        for (Taxi t: taxis) {
+        for (TaxiBean t: taxis) {
             if (t.getId() == id) {
                 taxis.remove(t);
                 return true;
