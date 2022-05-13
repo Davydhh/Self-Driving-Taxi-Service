@@ -28,9 +28,9 @@ public class TaxisService {
         return Response.ok(response).build();
     }
 
-    @Path("{taxi}")
+    @Path("{id}")
     @DELETE
-    public Response deleteUser(@PathParam("taxi") String taxi) {
+    public Response deleteTaxi(@PathParam("id") String taxi) {
         int id;
 
         try {
