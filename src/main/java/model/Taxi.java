@@ -10,6 +10,7 @@ import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import rest.beans.RegistrationResponse;
 import rest.beans.TaxiBean;
+import simulator.PM10Simulator;
 
 import javax.xml.bind.annotation.XmlRootElement;
 import java.awt.*;
@@ -46,19 +47,30 @@ public class Taxi {
     private static void register(TaxiBean taxiBean, String serverAddress) {
         ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean);
         if (response != null && response.getStatus() == 200) {
+            System.out.println("Registration succesfull");
             RegistrationResponse responseBody = new Gson().fromJson(response.getEntity(String.class),
                     RegistrationResponse.class);
-            System.out.println(responseBody);
 
             startPos = responseBody.getStarPos();
             otherTaxis = responseBody.getTaxis();
-            //TODO: Acquiring Data from sensors
-            if (!otherTaxis.isEmpty()) {
 
+            startAcquiringData();
+
+            if (!otherTaxis.isEmpty()) {
+                //TODO: send position to other taxis
             }
+
+            //TODO: Subscribe MQTT
         } else {
             System.exit(0);
         }
+    }
+
+    private static void startAcquiringData() {
+        System.out.println("Starting acquiring data from PM10 sensor");
+        TaxiBuffer buffer = new TaxiBuffer();
+        PM10Simulator pm10Simulator = new PM10Simulator(buffer);
+        pm10Simulator.start();
     }
 
     private static ClientResponse postRequest(String url, TaxiBean taxiBean) {
