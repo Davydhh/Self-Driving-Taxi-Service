@@ -5,9 +5,7 @@ import com.sun.jersey.api.client.Client;
 import com.sun.jersey.api.client.ClientHandlerException;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.jersey.api.client.WebResource;
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.*;
 import rest.beans.RegistrationResponse;
 import rest.beans.TaxiBean;
 import simulator.PM10Simulator;
@@ -40,27 +38,15 @@ public class Taxi {
 
     private static MqttClient mqttClient;
 
-    private static String broker;
-
-    private static String mqttClientId;
-
     private static void register(TaxiBean taxiBean, String serverAddress) {
         ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean);
         if (response != null && response.getStatus() == 200) {
-            System.out.println("Registration succesfull");
+            System.out.println("Registration successful");
             RegistrationResponse responseBody = new Gson().fromJson(response.getEntity(String.class),
                     RegistrationResponse.class);
 
             startPos = responseBody.getStarPos();
             otherTaxis = responseBody.getTaxis();
-
-            startAcquiringData();
-
-            if (!otherTaxis.isEmpty()) {
-                //TODO: send position to other taxis
-            }
-
-            //TODO: Subscribe MQTT
         } else {
             System.exit(0);
         }
@@ -84,25 +70,72 @@ public class Taxi {
         }
     }
 
-    private static void startMqttConnection() throws MqttException {
-        broker = "tcp://localhost:1883";
-        mqttClientId = MqttClient.generateClientId();
-        String topic = getDistrictTopicFromPosition();
-        int qos = 2;
-    }
+    private static void startAndSubMqttConnection() {
+        String broker = "tcp://localhost:1883";
+        String mqttClientId = MqttClient.generateClientId();
 
-    private static void subMqttTopic() throws MqttException {
+        try {
+            mqttClient = new MqttClient(broker, mqttClientId);
+        } catch (MqttException ex) {
+            ex.printStackTrace();
+            System.out.println("Error in mqtt connection creation, exit");
+            System.exit(0);
+        }
+
         MqttConnectOptions connOpts = new MqttConnectOptions();
         connOpts.setCleanSession(true);
 
         System.out.println(mqttClientId + " Connecting Broker " + broker);
-        mqttClient.connect(connOpts);
-        System.out.println(mqttClient + " Connected - Taxi ID: " + id);
+
+        try {
+            mqttClient.connect(connOpts);
+        } catch (MqttException ex) {
+            ex.printStackTrace();
+            System.out.println("Error in mqtt connection, exit");
+            System.exit(0);
+        }
+
+        System.out.println(mqttClientId + " Connected - Taxi ID: " + id);
+
+        String topic = getDistrictTopicFromPosition();
+
+        mqttClient.setCallback(new MqttCallback() {
+
+            public void messageArrived(String topic, MqttMessage message) {
+                String receivedMessage = new String(message.getPayload());
+                System.out.println("Taxi " + id + " received a Message!" +
+                        "\n\tTopic:   " + topic +
+                        "\n\tMessage: " + receivedMessage +
+                        "\n\tQoS:     " + message.getQos() + "\n");
+
+                //TODO: Start election
+            }
+
+            public void connectionLost(Throwable cause) {
+                System.out.println("Taxi " + id + " has lost the mqtt connection! cause:" + cause.getMessage() +
+                        "- Thread PID: " + Thread.currentThread().getId());
+            }
+
+            public void deliveryComplete(IMqttDeliveryToken token) {
+                // Not used
+            }
+
+        });
+
+        try {
+            mqttClient.subscribe(topic, 1);
+        } catch (MqttException ex) {
+            ex.printStackTrace();
+            System.out.println("Error subscribing to topic " + topic + ", exit");
+            System.exit(0);
+        }
+
+        System.out.println("Taxi " + id + " Subscribed to topics : " + topic);
     }
 
     private static String getDistrictTopicFromPosition() {
         double x = startPos.getX();
-        double y = endPoint.getY();
+        double y = startPos.getY();
 
         if (x <= 4 && y <= 4) {
             return "seta/smartcity/rides/district1";
@@ -122,6 +155,16 @@ public class Taxi {
             return true;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    public static void mqttDisconnect() {
+        try {
+            mqttClient.disconnect();
+        } catch (MqttException ex) {
+            ex.printStackTrace();
+            System.out.println("Error in mqtt disconnection");
+            System.exit(0);
         }
     }
 
@@ -157,6 +200,15 @@ public class Taxi {
             System.out.println("The server address is invalid!");
             System.exit(0);
         }
+
         register(new TaxiBean(id, port, ip), serverAddress);
+
+        startAcquiringData();
+
+        if (!otherTaxis.isEmpty()) {
+            //TODO: send position to other taxis
+        }
+
+        startAndSubMqttConnection();
     }
 }
