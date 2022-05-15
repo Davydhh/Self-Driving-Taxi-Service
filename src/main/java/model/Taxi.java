@@ -97,7 +97,7 @@ public class Taxi {
 
         System.out.println(mqttClientId + " Connected - Taxi ID: " + id);
 
-        String topic = getDistrictTopicFromPosition();
+        String subTopic = getDistrictTopicFromPosition();
 
         mqttClient.setCallback(new MqttCallback() {
 
@@ -123,14 +123,14 @@ public class Taxi {
         });
 
         try {
-            mqttClient.subscribe(topic, 1);
+            mqttClient.subscribe(subTopic, 1);
         } catch (MqttException ex) {
             ex.printStackTrace();
-            System.out.println("Error subscribing to topic " + topic + ", exit");
+            System.out.println("Error subscribing to topic " + subTopic + ", exit");
             System.exit(0);
         }
 
-        System.out.println("Taxi " + id + " Subscribed to topics : " + topic);
+        System.out.println("Taxi " + id + " Subscribed to topics : " + subTopic);
     }
 
     private static String getDistrictTopicFromPosition() {
