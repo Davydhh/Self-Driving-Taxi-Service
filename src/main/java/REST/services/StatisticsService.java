@@ -1,7 +1,7 @@
 package rest.services;
 
-import com.google.gson.Gson;
-import rest.beans.*;
+import rest.beans.Statistics;
+import rest.beans.TaxisStatistics;
 
 import javax.ws.rs.*;
 import javax.ws.rs.core.Response;
@@ -39,6 +39,13 @@ public class StatisticsService {
         }
 
         String response = TaxisStatistics.getInstance().getLastAverageStatisticsByTaxi(id, n);
+
+        if (response == null) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        } else if (response.equals("403")) {
+            return Response.status(Response.Status.FORBIDDEN).entity("Not enough statistics").build();
+        }
+
         return Response.ok(response).build();
     }
 }

@@ -49,6 +49,10 @@ public class TaxisStatistics {
 
         int size = taxisStatistics.size();
 
+        if (size < n) {
+            return "403";
+        }
+
         taxisStatistics = taxisStatistics.subList(size - n, size);
 
         //Computer average on km
