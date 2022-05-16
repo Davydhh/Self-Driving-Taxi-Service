@@ -54,7 +54,7 @@ public class StatisticsService {
                                                       @QueryParam("t2") long t2) {
         if (t1 >= t2) {
             return Response.status(Response.Status.FORBIDDEN).entity("t2 must be greater than " +
-                    "t2").build();
+                    "t1").build();
         }
 
         String response = TaxisStatistics.getInstance().getAllStatisticsBetweenTimestamps(t1, t2);

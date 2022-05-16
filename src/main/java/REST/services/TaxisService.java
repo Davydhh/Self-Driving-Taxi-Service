@@ -12,7 +12,7 @@ public class TaxisService {
     @GET
     @Produces({"application/json", "application/xml"})
     public Response getTaxisList(){
-        return Response.ok(Taxis.getInstance()).build();
+        return Response.ok(Taxis.getInstance().getTaxis()).build();
     }
 
     @POST
