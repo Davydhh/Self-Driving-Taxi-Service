@@ -7,6 +7,7 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import java.util.*;
+import java.util.function.ToDoubleFunction;
 import java.util.stream.Collectors;
 
 @XmlRootElement
@@ -55,19 +56,26 @@ public class TaxisStatistics {
 
         taxisStatistics = taxisStatistics.subList(size - n, size);
 
-        //Computer average on km
-        OptionalDouble averageKmOpt =
-                taxisStatistics.stream().mapToDouble(Statistics::getKm).average();
+        double averageKm = getAverageKm(taxisStatistics);
 
-        double averageKm = averageKmOpt.isPresent() ? averageKmOpt.getAsDouble() : 0;
+        double averageBattery = getAverageBattery(taxisStatistics);
 
-        //Computer average on battery
-        OptionalDouble averageBatteryOpt =
-                taxisStatistics.stream().mapToDouble(Statistics::getBattery).average();
+        double averagePollution = getAveragePollution(taxisStatistics);
 
-        double averageBattery = averageBatteryOpt.isPresent() ? averageBatteryOpt.getAsDouble() : 0;
+        double averageRides = getAverageRides(taxisStatistics);
 
-        //Computer average on pollution
+        return new Gson().toJson(new AverageStatisticsResponse(averageKm, averageBattery,
+                averagePollution, averageRides));
+    }
+
+    private double getAverageRides(List<Statistics> taxisStatistics) {
+        OptionalDouble averageRidesOpt =
+                taxisStatistics.stream().mapToDouble(Statistics::getRides).average();
+
+        return averageRidesOpt.isPresent() ? averageRidesOpt.getAsDouble() : 0;
+    }
+
+    private double getAveragePollution(List<Statistics> taxisStatistics) {
         List<Double> pollutionsAverages = new ArrayList<>();
 
         for (Statistics s: taxisStatistics) {
@@ -80,16 +88,71 @@ public class TaxisStatistics {
         OptionalDouble averagePollutionOpt =
                 pollutionsAverages.stream().mapToDouble(d -> d).average();
 
+        return averagePollutionOpt.isPresent() ?
+                averagePollutionOpt.getAsDouble() : 0;
+    }
+
+    private double getAverageKm(List<Statistics> taxisStatistics) {
+        OptionalDouble averageKmOpt =
+                taxisStatistics.stream().mapToDouble(Statistics::getKm).average();
+
+        return averageKmOpt.isPresent() ? averageKmOpt.getAsDouble() : 0;
+    }
+
+    private double getAverageBattery(List<Statistics> taxisStatistics) {
+        OptionalDouble averageBatteryOpt =
+                taxisStatistics.stream().mapToDouble(Statistics::getBattery).average();
+
+        return averageBatteryOpt.isPresent() ? averageBatteryOpt.getAsDouble() : 0;
+    }
+
+    private double getAverage(List<?> taxisStatistics,
+                              ToDoubleFunction mapToDoubleFunction) {
+        OptionalDouble averageBatteryOpt =
+                taxisStatistics.stream().mapToDouble(mapToDoubleFunction).average();
+
+        return averageBatteryOpt.isPresent() ? averageBatteryOpt.getAsDouble() : 0;
+    }
+    public String getAllStatisticsBetweenTimestamps(long t1, long t2) {
+        List<AverageStatistics> averageStatistics = new ArrayList<>();
+
+        //Compute average for each taxi
+        for(Map.Entry<Integer, List<Statistics>> entry : getTaxisStatistics().entrySet()) {
+            List<Statistics> statistics =
+                    entry.getValue().stream().filter(s -> s.getTimestamp() >= t1 && s.getTimestamp() <= t2).collect(Collectors.toList());
+
+            double averageKm = getAverageKm(statistics);
+            double averageBattery = getAverageBattery(statistics);
+            double averagePollution = getAveragePollution(statistics);
+            double averageRides = getAverageRides(statistics);
+
+            averageStatistics.add(new AverageStatistics(averageKm, averageBattery,
+                    averagePollution, averageRides));
+        }
+
+        OptionalDouble averageKmOpt =
+                averageStatistics.stream().mapToDouble(AverageStatistics::getKm).average();
+
+        double averageKm = averageKmOpt.isPresent() ? averageKmOpt.getAsDouble() : 0;
+
+        OptionalDouble averageBatteryOpt =
+                averageStatistics.stream().mapToDouble(AverageStatistics::getBattery).average();
+
+        double averageBattery =  averageBatteryOpt.isPresent() ?
+                averageBatteryOpt.getAsDouble() : 0;
+
+        OptionalDouble averagePollutionOpt =
+                averageStatistics.stream().mapToDouble(AverageStatistics::getPollution).average();
+
         double averagePollution = averagePollutionOpt.isPresent() ?
                 averagePollutionOpt.getAsDouble() : 0;
 
-        //Compute average on accomplished rides
         OptionalDouble averageRidesOpt =
-                taxisStatistics.stream().mapToDouble(Statistics::getRides).average();
+                averageStatistics.stream().mapToDouble(AverageStatistics::getRides).average();
 
-        double averageRides = averageRidesOpt.isPresent() ? averageRidesOpt.getAsDouble() : 0;
+        double averageRides =  averageRidesOpt.isPresent() ? averageRidesOpt.getAsDouble() : 0;
 
-        return new Gson().toJson(new AverageStatisticsResponse(averageKm, averageBattery,
+        return new Gson().toJson(new AverageStatistics(averageKm, averageBattery,
                 averagePollution, averageRides));
     }
 }

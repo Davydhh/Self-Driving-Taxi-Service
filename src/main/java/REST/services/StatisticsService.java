@@ -48,4 +48,17 @@ public class StatisticsService {
 
         return Response.ok(response).build();
     }
+
+    @GET
+    public Response getAllStatisticsBetweenTimestamps(@QueryParam("t1") long t1,
+                                                      @QueryParam("t2") long t2) {
+        if (t1 >= t2) {
+            return Response.status(Response.Status.FORBIDDEN).entity("t2 must be greater than " +
+                    "t2").build();
+        }
+
+        String response = TaxisStatistics.getInstance().getAllStatisticsBetweenTimestamps(t1, t2);
+
+        return Response.ok(response).build();
+    }
 }
