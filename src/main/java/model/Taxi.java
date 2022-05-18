@@ -16,7 +16,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URL;
+import java.util.InputMismatchException;
 import java.util.List;
+import java.util.Scanner;
 
 @XmlRootElement
 public class Taxi {
@@ -44,7 +46,7 @@ public class Taxi {
             System.out.println("Registration successful");
             RegistrationResponse responseBody = new Gson().fromJson(response.getEntity(String.class),
                     RegistrationResponse.class);
-
+            System.out.println(responseBody.toString());
             startPos = responseBody.getStarPos();
             otherTaxis = responseBody.getTaxis();
         } else {
@@ -168,34 +170,38 @@ public class Taxi {
         }
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
         ip = "http://localhost";
         battery = 100;
         restClient = Client.create();
 
-        BufferedReader inFromUser =
-                new BufferedReader(new InputStreamReader(System.in));
+        Scanner scanner = new Scanner(System.in);
+
         System.out.println("Creating taxi");
         System.out.println("Insert the id (number)");
         int id = -1;
         try {
-            id = Integer.parseInt(inFromUser.readLine());
-        } catch (NumberFormatException ex) {
+            id = scanner.nextInt();
+        } catch (InputMismatchException ex) {
             ex.printStackTrace();
             System.out.println("The id must be a number!");
             System.exit(0);
         }
+
         System.out.println("Insert the port (number)");
         int port = -1;
         try {
-            port = Integer.parseInt(inFromUser.readLine());
-        } catch (NumberFormatException ex) {
+            port = scanner.nextInt();
+        } catch (InputMismatchException ex) {
             ex.printStackTrace();
             System.out.println("The port must be a number!");
             System.exit(0);
         }
+
         System.out.println("Insert the server address");
-        String serverAddress = inFromUser.readLine();
+        scanner.nextLine();
+        String serverAddress = scanner.nextLine();
+
         if (!isValidURL(serverAddress)) {
             System.out.println("The server address is invalid!");
             System.exit(0);
