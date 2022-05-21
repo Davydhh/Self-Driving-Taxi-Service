@@ -9,14 +9,14 @@ public class RideRequest {
 
     private Point startPos;
 
-    private Point endPoint;
+    private Point endPos;
 
     public RideRequest() {};
 
     public RideRequest(int id, Point startPos, Point endPoint) {
         this.id = id;
         this.startPos = startPos;
-        this.endPoint = endPoint;
+        this.endPos = endPoint;
     }
 
     public int getId() {
@@ -27,7 +27,7 @@ public class RideRequest {
         return startPos;
     }
 
-    public Point getEndPoint() {
-        return endPoint;
+    public Point getEndPos() {
+        return endPos;
     }
 }

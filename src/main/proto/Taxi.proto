@@ -12,6 +12,26 @@ message AddResponse {
   required bool added = 1;
 }
 
+message RideRequest {
+  required int32 id = 1;
+  required double startX = 2;
+  required double startY = 3;
+  required double endX = 4;
+  required double endY = 5;
+}
+
+message ElectionRequest {
+  required double taxiDistance = 1;
+  required int32 taxiBattery = 2;
+  required int32 taxiId = 3;
+  required RideRequest rideRequest = 4;
+}
+
+message ElectionResponse {
+  required bool ok = 1;
+}
+
 service TaxiService {
   rpc AddTaxi(TaxiMessage) returns (AddResponse);
+  rpc SendElection(ElectionRequest) returns (ElectionResponse);
 }

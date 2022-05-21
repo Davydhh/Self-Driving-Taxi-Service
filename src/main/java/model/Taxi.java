@@ -10,9 +10,11 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import org.eclipse.paho.client.mqttv3.*;
 import rest.beans.RegistrationResponse;
+import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.TaxiServiceGrpc;
 import simulator.PM10Simulator;
+import thread.HandleRide;
 import thread.TaxiGrpcServer;
 
 import javax.xml.bind.annotation.XmlRootElement;
@@ -42,12 +44,18 @@ public class Taxi {
 
     private MqttClient mqttClient;
 
+    private boolean riding;
+
+    private boolean charging;
+
     public Taxi(int id, int port) {
         this.id = id;
         this.port = port;
         this.ip = "localhost";
         this.battery = 100;
         this.restClient = Client.create();
+        this.riding = false;
+        this.charging = false;
     }
 
     public int getId() {
@@ -82,6 +90,14 @@ public class Taxi {
         return mqttClient;
     }
 
+    public boolean isRiding() {
+        return riding;
+    }
+
+    public boolean isCharging() {
+        return charging;
+    }
+
     public void setStartPos(Point startPos) {
         this.startPos = startPos;
     }
@@ -102,10 +118,18 @@ public class Taxi {
         this.mqttClient = mqttClient;
     }
 
+    public void setRiding(boolean riding) {
+        this.riding = riding;
+    }
+
+    public void setCharging(boolean charging) {
+        this.charging = charging;
+    }
+
     private static void register(TaxiBean taxiBean, String serverAddress, Taxi taxi) {
         ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean, taxi.getRestClient());
         if (response != null && response.getStatus() == 200) {
-            System.out.println("Registration successful");
+            System.out.println("\nRegistration successful");
             RegistrationResponse responseBody = new Gson().fromJson(response.getEntity(String.class),
                     RegistrationResponse.class);
             System.out.println(responseBody.toString());
@@ -172,7 +196,11 @@ public class Taxi {
                         "\n\tMessage: " + receivedMessage +
                         "\n\tQoS:     " + message.getQos() + "\n");
 
-                //TODO: Start election
+                RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
+
+                if (!taxi.isRiding() && !taxi.isCharging()) {
+                    new HandleRide(taxi, rideRequest).start();
+                }
             }
 
             public void connectionLost(Throwable cause) {
@@ -305,7 +333,7 @@ public class Taxi {
         Taxi taxi = new Taxi(id, port);
         register(new TaxiBean(id, port, taxi.getIp()), serverAddress, taxi);
 
-        startAcquiringData();
+//        startAcquiringData();
 
         new TaxiGrpcServer(taxi).start();
 
