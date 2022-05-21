@@ -247,12 +247,18 @@ public class Taxi {
             stub.addTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.AddResponse>() {
                 @Override
                 public void onNext(seta.proto.taxi.Taxi.AddResponse value) {
-                    System.out.println("Taxi " + t.getId() + " correctly updated");
+                    if (value.getAdded()) {
+                        System.out.println("Taxi " + t.getId() + " correctly updated");
+                    } else {
+                        System.out.println("Taxi " + t.getId() + " have been not correctly " +
+                                "updated");
+                    }
                 }
 
                 @Override
                 public void onError(Throwable t) {
                     t.printStackTrace();
+                    System.out.println(0);
                 }
 
                 @Override
@@ -299,7 +305,7 @@ public class Taxi {
         Taxi taxi = new Taxi(id, port);
         register(new TaxiBean(id, port, taxi.getIp()), serverAddress, taxi);
 
-//        startAcquiringData();
+        startAcquiringData();
 
         new TaxiGrpcServer(taxi).start();
 
