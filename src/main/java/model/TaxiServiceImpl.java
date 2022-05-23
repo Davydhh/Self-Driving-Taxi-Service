@@ -32,6 +32,9 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                              StreamObserver<Taxi.ElectionResponse> responseObserver) {
         Taxi.RideRequest rideRequest = electionRequest.getRideRequest();
 
+        System.out.println("Taxi " + taxi.getId() + " has received election from " +
+                "taxi " + electionRequest.getTaxiId() + " about request " + rideRequest.getId());
+
         double currentDistance = Utils.getDistance(new Point((int) rideRequest.getStartX(),
                 (int) rideRequest.getStartY()), taxi.getStartPos());
         double requestDistance = electionRequest.getTaxiDistance();

@@ -14,6 +14,7 @@ import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.TaxiServiceGrpc;
 import simulator.PM10Simulator;
+import thread.HandleElection;
 import thread.HandleRide;
 import thread.TaxiGrpcServer;
 
@@ -126,6 +127,10 @@ public class Taxi {
         this.charging = charging;
     }
 
+    public void setBattery(int battery) {
+        this.battery = battery;
+    }
+
     private static void register(TaxiBean taxiBean, String serverAddress, Taxi taxi) {
         ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean, taxi.getRestClient());
         if (response != null && response.getStatus() == 200) {
@@ -199,7 +204,7 @@ public class Taxi {
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
                 if (!taxi.isRiding() && !taxi.isCharging()) {
-                    new HandleRide(taxi, rideRequest).start();
+                    new HandleElection(taxi, rideRequest).start();
                 }
             }
 
