@@ -27,7 +27,7 @@ message ElectionRequestMessage {
   required RideRequestMessage rideRequest = 4;
 }
 
-message ChargingRequest {
+message ChargingRequestMessage {
   required int32 taxiId = 1;
   required int32 stationId = 2;
   required int64 timestamp = 3;
@@ -44,5 +44,5 @@ message ElectionResponseMessage {
 service TaxiService {
   rpc AddTaxi(TaxiMessage) returns (AddTaxiResponseMessage);
   rpc SendElection(ElectionRequestMessage) returns (ElectionResponseMessage);
-  rpc SendChargingRequest(ChargingRequest) returns (ChargingResponseMessage);
+  rpc SendChargingRequest(ChargingRequestMessage) returns (ChargingResponseMessage);
 }

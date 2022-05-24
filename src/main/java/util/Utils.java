@@ -22,4 +22,8 @@ public class Utils {
             return "seta/smartcity/rides/district4";
         }
     }
+
+    public static long getCurrentTimestamp() {
+        return System.currentTimeMillis();
+    }
 }

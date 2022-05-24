@@ -33,7 +33,7 @@ public class Taxi {
 
     private final String ip;
 
-    private int battery;
+    private Integer battery;
 
     private Point startPos;
 
@@ -51,6 +51,8 @@ public class Taxi {
 
     private int requestIdTaken;
 
+    private int rechargeStationId;
+
     public Taxi(int id, int port) {
         this.id = id;
         this.port = port;
@@ -59,6 +61,7 @@ public class Taxi {
         this.restClient = Client.create();
         this.riding = false;
         this.charging = false;
+        this.rechargeStationId = -1;
     }
 
     public int getId() {
@@ -73,7 +76,7 @@ public class Taxi {
         return ip;
     }
 
-    public int getBattery() {
+    public Integer getBattery() {
         return battery;
     }
 
@@ -91,6 +94,10 @@ public class Taxi {
 
     public boolean isCharging() {
         return charging;
+    }
+
+    public int getRechargeStationId() {
+        return rechargeStationId;
     }
 
     public String getTopic() {
@@ -122,6 +129,10 @@ public class Taxi {
     public void setRequestIdTaken(int requestIdTaken) {
         this.requestIdTaken = requestIdTaken;
         System.out.println("Set Taxi " + id + " request " + requestIdTaken);
+    }
+
+    public void setRechargeStationId(int rechargeStationId) {
+        this.rechargeStationId = rechargeStationId;
     }
 
     @Override
@@ -215,8 +226,7 @@ public class Taxi {
             }
 
             public void connectionLost(Throwable cause) {
-                System.out.println("Taxi " + id + " has lost the mqtt connection! cause:" + cause.getMessage() +
-                        "- Thread PID: " + Thread.currentThread().getId());
+                System.out.println("Taxi " + id + " has lost the mqtt connection! cause:" + cause.getMessage());
             }
 
             public void deliveryComplete(IMqttDeliveryToken token) {

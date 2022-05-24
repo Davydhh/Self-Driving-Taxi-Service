@@ -37,7 +37,7 @@ public class HandleRide extends Thread {
                     throw new RuntimeException(e);
                 }
             } else {
-                System.out.println("Taxi " + taxi.getStartPos() + " is just riding for request " + request.getId());
+                System.out.println("Taxi " + taxi.getId() + " is just riding for request " + request.getId());
             }
         }
     }

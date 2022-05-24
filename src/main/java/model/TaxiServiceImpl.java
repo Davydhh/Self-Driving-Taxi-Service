@@ -120,4 +120,36 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
             }
         }
     }
+
+    public void sendChargingRequest(Taxi.ChargingRequestMessage chargingRequest,
+                                    StreamObserver<Taxi.ChargingResponseMessage> responseObserver) {
+        int senderTaxiId = chargingRequest.getTaxiId();
+        int stationId = chargingRequest.getStationId();
+
+        System.out.println("Taxi " + taxi.getId() + " has received charging request from Taxi " + senderTaxiId +
+                " about station " + chargingRequest.getStationId());
+
+        if (taxi.isCharging() && taxi.getRechargeStationId() == stationId) {
+            System.out.println("Taxi " + taxi.getId() + " is just charging on station " + stationId);
+            //TODO: Accoda la richiesta
+        } else if (taxi.isCharging() && taxi.getRechargeStationId() != stationId) {
+            System.out.println("Taxi " + taxi.getId() + " is charging but on station " + stationId);
+            Taxi.ChargingResponseMessage response = Taxi.ChargingResponseMessage.newBuilder()
+                    .setOk(true)
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        } else if (!taxi.isCharging() && taxi.getRechargeStationId() == stationId) {
+            System.out.println("Taxi " + taxi.getId() + " is not charging but want charging in " +
+                    "the same station " + stationId);
+            //TODO: Accoda la richiesta
+        } else {
+            System.out.println("Taxi " + taxi.getId() + " is not charging on station " + stationId);
+            Taxi.ChargingResponseMessage response = Taxi.ChargingResponseMessage.newBuilder()
+                    .setOk(true)
+                    .build();
+            responseObserver.onNext(response);
+            responseObserver.onCompleted();
+        }
+    }
 }
