@@ -8,11 +8,11 @@ message TaxiMessage {
   required string ip = 5;
 }
 
-message AddResponse {
+message AddTaxiResponseMessage {
   required bool added = 1;
 }
 
-message RideRequest {
+message RideRequestMessage {
   required int32 id = 1;
   required double startX = 2;
   required double startY = 3;
@@ -20,18 +20,29 @@ message RideRequest {
   required double endY = 5;
 }
 
-message ElectionRequest {
+message ElectionRequestMessage {
   required double taxiDistance = 1;
   required int32 taxiBattery = 2;
   required int32 taxiId = 3;
-  required RideRequest rideRequest = 4;
+  required RideRequestMessage rideRequest = 4;
 }
 
-message ElectionResponse {
+message ChargingRequest {
+  required int32 taxiId = 1;
+  required int32 stationId = 2;
+  required int64 timestamp = 3;
+}
+
+message ChargingResponseMessage {
+  required bool ok = 1;
+}
+
+message ElectionResponseMessage {
   required bool ok = 1;
 }
 
 service TaxiService {
-  rpc AddTaxi(TaxiMessage) returns (AddResponse);
-  rpc SendElection(ElectionRequest) returns (ElectionResponse);
+  rpc AddTaxi(TaxiMessage) returns (AddTaxiResponseMessage);
+  rpc SendElection(ElectionRequestMessage) returns (ElectionResponseMessage);
+  rpc SendChargingRequest(ChargingRequest) returns (ChargingResponseMessage);
 }

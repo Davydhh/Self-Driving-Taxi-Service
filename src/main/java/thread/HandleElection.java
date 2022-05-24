@@ -6,8 +6,9 @@ import io.grpc.stub.StreamObserver;
 import model.Taxi;
 import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
-import seta.proto.taxi.Taxi.ElectionRequest;
-import seta.proto.taxi.Taxi.ElectionResponse;
+import seta.proto.taxi.Taxi.ElectionRequestMessage;
+import seta.proto.taxi.Taxi.ElectionResponseMessage;
+import seta.proto.taxi.Taxi.RideRequestMessage;
 import seta.proto.taxi.TaxiServiceGrpc;
 
 import java.util.List;
@@ -35,8 +36,7 @@ public class HandleElection extends Thread {
 
         new HandleRide(taxi, request, distance).start();
 
-        seta.proto.taxi.Taxi.RideRequest rideRequest =
-                seta.proto.taxi.Taxi.RideRequest.newBuilder()
+        RideRequestMessage rideRequest = RideRequestMessage.newBuilder()
                         .setId(request.getId())
                         .setStartX(request.getStartPos().getX())
                         .setStartY(request.getStartPos().getY())
@@ -44,8 +44,7 @@ public class HandleElection extends Thread {
                         .setEndY(request.getEndPos().getY())
                         .build();
 
-        ElectionRequest electionRequest =
-                ElectionRequest.newBuilder()
+        ElectionRequestMessage electionRequest = ElectionRequestMessage.newBuilder()
                         .setTaxiId(taxi.getId())
                         .setTaxiBattery(taxi.getBattery())
                         .setTaxiDistance(distance)
@@ -65,9 +64,9 @@ public class HandleElection extends Thread {
                 System.out.println("Taxi " + taxi.getId() + " send election to taxi " + t.getId() + " about request " + request.getId());
                 TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
 
-                stub.sendElection(electionRequest, new StreamObserver<ElectionResponse>() {
+                stub.sendElection(electionRequest, new StreamObserver<ElectionResponseMessage>() {
                     @Override
-                    public void onNext(ElectionResponse value) {
+                    public void onNext(ElectionResponseMessage value) {
                         if (!value.getOk()) {
                             System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
                                     "Taxi " + t.getId() + " about request " + request.getId());

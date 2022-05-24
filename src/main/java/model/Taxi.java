@@ -99,7 +99,7 @@ public class Taxi {
 
     public void setStartPos(Point startPos) {
         this.startPos = startPos;
-        System.out.println("Taxi new starting position " + startPos);
+        System.out.println("Taxi " + id + " new starting position " + startPos);
     }
     public void setRiding(boolean riding) {
         this.riding = riding;
@@ -291,9 +291,9 @@ public class Taxi {
             TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
                     seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
-            stub.addTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.AddResponse>() {
+            stub.addTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.AddTaxiResponseMessage>() {
                 @Override
-                public void onNext(seta.proto.taxi.Taxi.AddResponse value) {
+                public void onNext(seta.proto.taxi.Taxi.AddTaxiResponseMessage value) {
                     if (value.getAdded()) {
                         System.out.println("Taxi " + t.getId() + " correctly updated");
                     } else {
