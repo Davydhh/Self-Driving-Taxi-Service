@@ -26,17 +26,18 @@ public class HandleRide extends Thread {
                     taxi.wait();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
-                    throw new RuntimeException(e);
                 }
             }
 
-            if (taxi.isRiding()) {
-                System.out.println("Taxi " + taxi.getId() + " take charge or the ride " + request.getId());
+            if (taxi.isRiding() && taxi.getRequestIdTaken() == request.getId()) {
+                System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
                 try {
                     takeRequest();
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
+            } else {
+                System.out.println("Taxi " + taxi.getStartPos() + " is just riding for request " + request.getId());
             }
         }
     }
@@ -44,11 +45,14 @@ public class HandleRide extends Thread {
     private void takeRequest() throws InterruptedException {
         Thread.sleep(5000);
         taxi.setStartPos(request.getEndPos());
+        taxi.subMqttTopic();
         taxi.setBattery(taxi.getBattery() - (int) Math.round(distance));
 
         if (taxi.getBattery() < 30) {
-
+//            new ChargingRequest(taxi).join();
         }
+
+        taxi.setRiding(false);
     }
 }
 

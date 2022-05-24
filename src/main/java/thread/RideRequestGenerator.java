@@ -1,10 +1,9 @@
 package thread;
 
 import com.google.gson.Gson;
-import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.*;
 import rest.beans.RideRequest;
-import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttMessage;
+import util.Utils;
 
 import java.awt.*;
 import java.util.Random;
@@ -47,13 +46,15 @@ public class RideRequestGenerator extends Thread {
         } while (startPos == endPos);
 
         RideRequest request = new RideRequest(requestId, startPos, endPos);
-        String topic = getDistrictTopicFromPosition(startPos);
+        String pubTopic = Utils.getDistrictTopicFromPosition(startPos);
         String payload = new Gson().toJson(request);
         MqttMessage message = new MqttMessage(payload.getBytes());
         message.setQos(1);
+
         System.out.println("Publishing message: " + payload);
+
         try {
-            client.publish(topic, message);
+            client.publish(pubTopic, message);
         } catch (MqttException me ) {
             System.out.println("reason " + me.getReasonCode());
             System.out.println("msg " + me.getMessage());
@@ -62,22 +63,7 @@ public class RideRequestGenerator extends Thread {
             System.out.println("excep " + me);
             me.printStackTrace();
         }
-        System.out.println("Message published to topic " + topic);
+        System.out.println("Message published to topic " + pubTopic);
         System.out.println();
-    }
-
-    private String getDistrictTopicFromPosition(Point position) {
-        double x = position.getX();
-        double y = position.getY();
-
-        if (x <= 4 && y <= 4) {
-            return "seta/smartcity/rides/district1";
-        } else if (x >= 5 && y <= 4) {
-            return "seta/smartcity/rides/district3";
-        } else if (x <= 4 && y >= 5){
-            return "seta/smartcity/rides/district2";
-        } else {
-            return "seta/smartcity/rides/district4";
-        }
     }
 }

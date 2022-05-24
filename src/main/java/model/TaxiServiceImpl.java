@@ -35,44 +35,37 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
         System.out.println("Taxi " + taxi.getId() + " has received election from " +
                 "taxi " + electionRequest.getTaxiId() + " about request " + rideRequest.getId());
 
-        double currentDistance = Utils.getDistance(new Point((int) rideRequest.getStartX(),
-                (int) rideRequest.getStartY()), taxi.getStartPos());
-        double requestDistance = electionRequest.getTaxiDistance();
-
-        if (currentDistance < requestDistance) {
-            System.out.println("Taxi " + taxi.getId() + " has better distance (" + currentDistance +
-                    ") than Taxi " + electionRequest.getTaxiId() + " (" + requestDistance + ")"
-                    + " about request " + rideRequest.getId());
+        if (!taxi.getTopic().equals(Utils.getDistrictTopicFromPosition(
+                new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY())))) {
+            System.out.println("Taxi " + taxi.getId() + " has received request " + rideRequest.getId() +
+                    " that is from another district");
             Taxi.ElectionResponse response =
-                    Taxi.ElectionResponse.newBuilder().setOk(false).build();
+                    Taxi.ElectionResponse.newBuilder().setOk(true).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        } else if (currentDistance > requestDistance) {
-            System.out.println("Taxi " + taxi.getId() + " has worse distance (" + currentDistance +
-                    ") than Taxi " + electionRequest.getTaxiId() + " (" + requestDistance + ")"
-                    + " about request " + rideRequest.getId());
+        } else if ((taxi.isRiding() && taxi.getRequestIdTaken() != rideRequest.getId()) || taxi.isCharging()) {
+            System.out.println("Taxi " + taxi.getId() + " is already riding but for request + " + taxi.getRequestIdTaken() +
+                    " or is charging");
             Taxi.ElectionResponse response =
                     Taxi.ElectionResponse.newBuilder().setOk(true).build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
         } else {
-            System.out.println("Taxi " + taxi.getId() + " and Taxi " + electionRequest.getTaxiId()
-                    + " have the same distance: " + currentDistance + " = " + requestDistance
-                    + " about request " + rideRequest.getId());
-            int currentTaxiBattery = taxi.getBattery();
-            int requestTaxiBattery = electionRequest.getTaxiBattery();
+            double currentDistance = Utils.getDistance(new Point((int) rideRequest.getStartX(),
+                    (int) rideRequest.getStartY()), taxi.getStartPos());
+            double requestDistance = electionRequest.getTaxiDistance();
 
-            if (currentTaxiBattery > requestTaxiBattery) {
-                System.out.println("Taxi " + taxi.getId() + " has better battery (" + currentTaxiBattery +
-                        ") than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
+            if (currentDistance < requestDistance) {
+                System.out.println("Taxi " + taxi.getId() + " has better distance (" + currentDistance +
+                        ") than Taxi " + electionRequest.getTaxiId() + " (" + requestDistance + ")"
                         + " about request " + rideRequest.getId());
                 Taxi.ElectionResponse response =
                         Taxi.ElectionResponse.newBuilder().setOk(false).build();
                 responseObserver.onNext(response);
                 responseObserver.onCompleted();
-            } else if (currentTaxiBattery < requestTaxiBattery) {
-                System.out.println("Taxi " + taxi.getId() + " has worse battery (" + currentTaxiBattery +
-                        ") than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
+            } else if (currentDistance > requestDistance) {
+                System.out.println("Taxi " + taxi.getId() + " has worse distance (" + currentDistance +
+                        ") than Taxi " + electionRequest.getTaxiId() + " (" + requestDistance + ")"
                         + " about request " + rideRequest.getId());
                 Taxi.ElectionResponse response =
                         Taxi.ElectionResponse.newBuilder().setOk(true).build();
@@ -80,25 +73,49 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                 responseObserver.onCompleted();
             } else {
                 System.out.println("Taxi " + taxi.getId() + " and Taxi " + electionRequest.getTaxiId()
-                        + " have the same battery: " + currentTaxiBattery + " = " + requestTaxiBattery
+                        + " have the same distance: " + currentDistance + " = " + requestDistance
                         + " about request " + rideRequest.getId());
-                int currentTaxiId = taxi.getId();
-                int requestTaxiId = electionRequest.getTaxiId();
+                int currentTaxiBattery = taxi.getBattery();
+                int requestTaxiBattery = electionRequest.getTaxiBattery();
 
-                if (currentTaxiId > requestTaxiId) {
-                    System.out.println("Taxi " + taxi.getId() + " has greater id " +
-                            "than Taxi " + electionRequest.getTaxiId() + " about request " + rideRequest.getId());
+                if (currentTaxiBattery > requestTaxiBattery) {
+                    System.out.println("Taxi " + taxi.getId() + " has better battery (" + currentTaxiBattery +
+                            ") than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
+                            + " about request " + rideRequest.getId());
                     Taxi.ElectionResponse response =
                             Taxi.ElectionResponse.newBuilder().setOk(false).build();
                     responseObserver.onNext(response);
                     responseObserver.onCompleted();
-                } else {
-                    System.out.println("Taxi " + taxi.getId() + " has lesser id " +
-                            "than Taxi " + electionRequest.getTaxiId() + " about request " + rideRequest.getId());
+                } else if (currentTaxiBattery < requestTaxiBattery) {
+                    System.out.println("Taxi " + taxi.getId() + " has worse battery (" + currentTaxiBattery +
+                            ") than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
+                            + " about request " + rideRequest.getId());
                     Taxi.ElectionResponse response =
                             Taxi.ElectionResponse.newBuilder().setOk(true).build();
                     responseObserver.onNext(response);
                     responseObserver.onCompleted();
+                } else {
+                    System.out.println("Taxi " + taxi.getId() + " and Taxi " + electionRequest.getTaxiId()
+                            + " have the same battery: " + currentTaxiBattery + " = " + requestTaxiBattery
+                            + " about request " + rideRequest.getId());
+                    int currentTaxiId = taxi.getId();
+                    int requestTaxiId = electionRequest.getTaxiId();
+
+                    if (currentTaxiId > requestTaxiId) {
+                        System.out.println("Taxi " + taxi.getId() + " has greater id " +
+                                "than Taxi " + electionRequest.getTaxiId() + " about request " + rideRequest.getId());
+                        Taxi.ElectionResponse response =
+                                Taxi.ElectionResponse.newBuilder().setOk(false).build();
+                        responseObserver.onNext(response);
+                        responseObserver.onCompleted();
+                    } else {
+                        System.out.println("Taxi " + taxi.getId() + " has lesser id " +
+                                "than Taxi " + electionRequest.getTaxiId() + " about request " + rideRequest.getId());
+                        Taxi.ElectionResponse response =
+                                Taxi.ElectionResponse.newBuilder().setOk(true).build();
+                        responseObserver.onNext(response);
+                        responseObserver.onCompleted();
+                    }
                 }
             }
         }

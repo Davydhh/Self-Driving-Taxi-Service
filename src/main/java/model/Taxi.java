@@ -15,7 +15,6 @@ import rest.beans.TaxiBean;
 import seta.proto.taxi.TaxiServiceGrpc;
 import simulator.PM10Simulator;
 import thread.HandleElection;
-import thread.HandleRide;
 import thread.TaxiGrpcServer;
 
 import javax.xml.bind.annotation.XmlRootElement;
@@ -23,6 +22,7 @@ import java.awt.*;
 import java.net.URL;
 import java.util.InputMismatchException;
 import java.util.List;
+import java.util.Objects;
 import java.util.Scanner;
 
 @XmlRootElement
@@ -37,17 +37,19 @@ public class Taxi {
 
     private Point startPos;
 
-    private Point endPoint;
-
     private List<TaxiBean> otherTaxis;
 
-    private Client restClient;
+    private final Client restClient;
 
     private MqttClient mqttClient;
 
     private boolean riding;
 
     private boolean charging;
+
+    private String topic;
+
+    private int requestIdTaken;
 
     public Taxi(int id, int port) {
         this.id = id;
@@ -79,16 +81,8 @@ public class Taxi {
         return startPos;
     }
 
-    public Point getEndPoint() {
-        return endPoint;
-    }
-
-    public Client getRestClient() {
-        return restClient;
-    }
-
-    public MqttClient getMqttClient() {
-        return mqttClient;
+    public int getRequestIdTaken() {
+        return requestIdTaken;
     }
 
     public boolean isRiding() {
@@ -99,28 +93,21 @@ public class Taxi {
         return charging;
     }
 
+    public String getTopic() {
+        return topic;
+    }
+
     public void setStartPos(Point startPos) {
         this.startPos = startPos;
+        System.out.println("Taxi new starting position " + startPos);
     }
-
-    public void setEndPoint(Point endPoint) {
-        this.endPoint = endPoint;
-    }
-
-    public void setOtherTaxis(List<TaxiBean> otherTaxis) {
-        this.otherTaxis = otherTaxis;
-    }
-
-    public void setRestClient(Client restClient) {
-        this.restClient = restClient;
-    }
-
-    public void setMqttClient(MqttClient mqttClient) {
-        this.mqttClient = mqttClient;
-    }
-
     public void setRiding(boolean riding) {
         this.riding = riding;
+        if (riding) {
+            System.out.println("Taxi " + id + " is riding");
+        } else {
+            System.out.println("Taxi " + id + " has finished the ride");
+        }
     }
 
     public void setCharging(boolean charging) {
@@ -129,30 +116,49 @@ public class Taxi {
 
     public void setBattery(int battery) {
         this.battery = battery;
+        System.out.println("Battery level: " + this.battery);
     }
 
-    private static void register(TaxiBean taxiBean, String serverAddress, Taxi taxi) {
-        ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean, taxi.getRestClient());
+    public void setRequestIdTaken(int requestIdTaken) {
+        this.requestIdTaken = requestIdTaken;
+        System.out.println("Set Taxi " + id + " request " + requestIdTaken);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Taxi taxi = (Taxi) o;
+        return id == taxi.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    private void register(TaxiBean taxiBean, String serverAddress) {
+        ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean);
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nRegistration successful");
             RegistrationResponse responseBody = new Gson().fromJson(response.getEntity(String.class),
                     RegistrationResponse.class);
             System.out.println(responseBody.toString());
-            taxi.setStartPos(responseBody.getStarPos());
-            taxi.setOtherTaxis(responseBody.getTaxis());
+            startPos = responseBody.getStarPos();
+            otherTaxis = responseBody.getTaxis();
         } else {
             System.exit(0);
         }
     }
 
-    private static void startAcquiringData() {
+    private void startAcquiringData() {
         System.out.println("Starting acquiring data from PM10 sensor");
         TaxiBuffer buffer = new TaxiBuffer();
         PM10Simulator pm10Simulator = new PM10Simulator(buffer);
         pm10Simulator.start();
     }
 
-    private static ClientResponse postRequest(String url, TaxiBean taxiBean, Client restClient) {
+    private ClientResponse postRequest(String url, TaxiBean taxiBean) {
         WebResource webResource = restClient.resource(url);
         String input = new Gson().toJson(taxiBean);
         try {
@@ -163,12 +169,12 @@ public class Taxi {
         }
     }
 
-    private static void startAndSubMqttConnection(Taxi taxi) {
+    private void startMqttConnection(Taxi taxi) {
         String broker = "tcp://localhost:1883";
         String mqttClientId = MqttClient.generateClientId();
 
         try {
-            taxi.setMqttClient(new MqttClient(broker, mqttClientId));
+            mqttClient = new MqttClient(broker, mqttClientId);
         } catch (MqttException ex) {
             ex.printStackTrace();
             System.out.println("Error in mqtt connection creation, exit");
@@ -181,35 +187,35 @@ public class Taxi {
         System.out.println(mqttClientId + " Connecting Broker " + broker);
 
         try {
-            taxi.getMqttClient().connect(connOpts);
+            mqttClient.connect(connOpts);
         } catch (MqttException ex) {
             ex.printStackTrace();
             System.out.println("Error in mqtt connection, exit");
             System.exit(0);
         }
 
-        System.out.println(mqttClientId + " Connected - Taxi ID: " + taxi.getId());
+        System.out.println(mqttClientId + " Connected - Taxi ID: " + id);
 
-        String subTopic = getDistrictTopicFromPosition(taxi.getStartPos());
-
-        taxi.getMqttClient().setCallback(new MqttCallback() {
+        mqttClient.setCallback(new MqttCallback() {
 
             public void messageArrived(String topic, MqttMessage message) {
                 String receivedMessage = new String(message.getPayload());
-                System.out.println("Taxi " + taxi.getId() + " received a Message!" +
+                System.out.println("Taxi " + id + " received a Message!" +
                         "\n\tTopic:   " + topic +
                         "\n\tMessage: " + receivedMessage +
                         "\n\tQoS:     " + message.getQos() + "\n");
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                if (!taxi.isRiding() && !taxi.isCharging()) {
+                if (!riding && !charging) {
                     new HandleElection(taxi, rideRequest).start();
+                } else {
+                    System.out.println("Taxi " + id + " is already riding or charging");
                 }
             }
 
             public void connectionLost(Throwable cause) {
-                System.out.println("Taxi " + taxi.getId() + " has lost the mqtt connection! cause:" + cause.getMessage() +
+                System.out.println("Taxi " + id + " has lost the mqtt connection! cause:" + cause.getMessage() +
                         "- Thread PID: " + Thread.currentThread().getId());
             }
 
@@ -218,30 +224,38 @@ public class Taxi {
             }
 
         });
-
-        try {
-            taxi.getMqttClient().subscribe(subTopic, 1);
-        } catch (MqttException ex) {
-            ex.printStackTrace();
-            System.out.println("Error subscribing to topic " + subTopic + ", exit");
-            System.exit(0);
-        }
-
-        System.out.println("Taxi " + taxi.getId() + " Subscribed to topics : " + subTopic);
     }
 
-    private static String getDistrictTopicFromPosition(Point startPos) {
+    public void subMqttTopic() {
         double x = startPos.getX();
         double y = startPos.getY();
+        String newTopic;
 
         if (x <= 4 && y <= 4) {
-            return "seta/smartcity/rides/district1";
+            newTopic = "seta/smartcity/rides/district1";
         } else if (x >= 5 && y <= 4) {
-            return "seta/smartcity/rides/district3";
+            newTopic = "seta/smartcity/rides/district3";
         } else if (x <= 4 && y >= 5){
-            return "seta/smartcity/rides/district2";
+            newTopic = "seta/smartcity/rides/district2";
         } else {
-            return "seta/smartcity/rides/district4";
+            newTopic = "seta/smartcity/rides/district4";
+        }
+
+        if (!newTopic.equals(this.topic)) {
+            try {
+                if (topic != null) {
+                    mqttClient.unsubscribe(topic);
+                }
+                mqttClient.subscribe(newTopic, 1);
+                this.topic = newTopic;
+            } catch (MqttException ex) {
+                ex.printStackTrace();
+                mqttDisconnect();
+                System.out.println("Error subscribing to topic " + newTopic + ", exit");
+                System.exit(0);
+            }
+
+            System.out.println("Taxi " + id + " Subscribed to topics : " + newTopic);
         }
     }
 
@@ -255,7 +269,7 @@ public class Taxi {
         }
     }
 
-    public static void mqttDisconnect(MqttClient mqttClient) {
+    public void mqttDisconnect() {
         try {
             mqttClient.disconnect();
         } catch (MqttException ex) {
@@ -269,14 +283,14 @@ public class Taxi {
         return otherTaxis;
     }
 
-    private static void sendToOtherTaxis(Taxi taxi) {
-        for (TaxiBean t: taxi.getOtherTaxis()) {
+    private void sendToOtherTaxis() {
+        for (TaxiBean t: otherTaxis) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            System.out.println("Taxi " + taxi.getId() + " connected to address " + t.getIp() + ":" + t.getPort());
+            System.out.println("Taxi " + id + " connected to address " + t.getIp() + ":" + t.getPort());
             TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
-                    seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(taxi.getId()).setIp(taxi.getIp()).setPort(taxi.getPort()).setStartX(taxi.getStartPos().getX()).setStartY(taxi.getStartPos().getY()).build();
+                    seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
             stub.addTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.AddResponse>() {
                 @Override
                 public void onNext(seta.proto.taxi.Taxi.AddResponse value) {
@@ -336,16 +350,17 @@ public class Taxi {
         }
 
         Taxi taxi = new Taxi(id, port);
-        register(new TaxiBean(id, port, taxi.getIp()), serverAddress, taxi);
+        taxi.register(new TaxiBean(id, port, taxi.getIp()), serverAddress);
 
 //        startAcquiringData();
 
         new TaxiGrpcServer(taxi).start();
 
         if (!taxi.getOtherTaxis().isEmpty()) {
-            sendToOtherTaxis(taxi);
+            taxi.sendToOtherTaxis();
         }
 
-        startAndSubMqttConnection(taxi);
+        taxi.startMqttConnection(taxi);
+        taxi.subMqttTopic();
     }
 }

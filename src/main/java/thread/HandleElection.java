@@ -33,8 +33,7 @@ public class HandleElection extends Thread {
 
         double distance = getDistance(request.getStartPos(), taxi.getStartPos());
 
-        HandleRide handleRideThread = new HandleRide(taxi, request, distance);
-        handleRideThread.start();
+        new HandleRide(taxi, request, distance).start();
 
         seta.proto.taxi.Taxi.RideRequest rideRequest =
                 seta.proto.taxi.Taxi.RideRequest.newBuilder()
@@ -55,46 +54,51 @@ public class HandleElection extends Thread {
 
         List<TaxiBean> taxiList = taxi.getOtherTaxis();
 
-        for (TaxiBean t : taxiList) {
-            final ManagedChannel channel =
-                    ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            System.out.println("Taxi " + taxi.getId() + " send election to taxi " + t.getId() + " about request " + request.getId());
-            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
+        if (taxiList.isEmpty()) {
+            taxi.setRiding(true);
+            taxi.setRequestIdTaken(request.getId());
+            taxi.notify();
+        } else {
+            for (TaxiBean t : taxiList) {
+                final ManagedChannel channel =
+                        ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
+                System.out.println("Taxi " + taxi.getId() + " send election to taxi " + t.getId() + " about request " + request.getId());
+                TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
 
-            stub.sendElection(electionRequest, new StreamObserver<ElectionResponse>() {
-                @Override
-                public void onNext(ElectionResponse value) {
-                    if (!value.getOk()) {
-                        System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
-                                "Taxi " + t.getId() + " about request " + request.getId());
-                        handleRideThread.interrupt();
-                        interrupt();
-                    }
+                stub.sendElection(electionRequest, new StreamObserver<ElectionResponse>() {
+                    @Override
+                    public void onNext(ElectionResponse value) {
+                        if (!value.getOk()) {
+                            System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
+                                    "Taxi " + t.getId() + " about request " + request.getId());
+                        } else {
+                            System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
+                                    + " about request " + request.getId());
 
-                    System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
-                            + " about request " + request.getId());
+                            synchronized (taxi) {
+                                okCounter += 1;
 
-                    synchronized (taxi) {
-                        okCounter += 1;
-
-                        if (okCounter == taxiList.size()) {
-                            taxi.setRiding(true);
-                            taxi.notify();
+                                if (okCounter == taxiList.size()) {
+                                    taxi.setRiding(true);
+                                    taxi.setRequestIdTaken(request.getId());
+                                    taxi.notifyAll();
+                                }
+                            }
                         }
                     }
-                }
 
-                @Override
-                public void onError(Throwable t) {
-                    t.printStackTrace();
-//                    System.exit(0);
-                }
+                    @Override
+                    public void onError(Throwable t) {
+                        t.printStackTrace();
+                        System.exit(0);
+                    }
 
-                @Override
-                public void onCompleted() {
-                    channel.shutdownNow();
-                }
-            });
+                    @Override
+                    public void onCompleted() {
+                        channel.shutdownNow();
+                    }
+                });
+            }
         }
     }
 }
