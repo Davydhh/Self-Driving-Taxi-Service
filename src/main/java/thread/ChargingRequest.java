@@ -34,6 +34,8 @@ public class ChargingRequest extends Thread {
                 .setTimestamp(Utils.getCurrentTimestamp())
                 .build();
 
+        taxi.setRechargeStationId(station.getId());
+
         new HandleCharging(taxi, station).start();
 
         List<TaxiBean> taxiList = taxi.getOtherTaxis();
@@ -57,7 +59,6 @@ public class ChargingRequest extends Thread {
 
                             if (okCounter == taxiList.size()) {
                                 taxi.setCharging(true);
-                                taxi.setRechargeStationId(station.getId());
                                 taxi.notifyAll();
                             }
                         }
