@@ -20,7 +20,7 @@ public class HandleRide extends Thread {
     public void run() {
         System.out.println("Waiting for election for request " + request.getId());
 
-        while (!taxi.isRiding()) {
+        while (!taxi.isDriving()) {
             synchronized (taxi) {
                 try {
                     taxi.wait();
@@ -29,7 +29,7 @@ public class HandleRide extends Thread {
                 }
             }
 
-            if (taxi.isRiding() && taxi.getRequestIdTaken() == request.getId()) {
+            if (taxi.isDriving() && taxi.getRequestIdTaken() == request.getId()) {
                 System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
                 try {
                     takeRequest();
@@ -37,7 +37,7 @@ public class HandleRide extends Thread {
                     throw new RuntimeException(e);
                 }
             } else {
-                System.out.println("Taxi " + taxi.getId() + " is just riding for request " + request.getId());
+                System.out.println("Taxi " + taxi.getId() + " is just driving for request " + taxi.getRequestIdTaken());
             }
         }
     }
@@ -47,12 +47,12 @@ public class HandleRide extends Thread {
         taxi.setStartPos(request.getEndPos());
         taxi.subMqttTopic();
         taxi.setBattery(taxi.getBattery() - (int) Math.round(distance));
+        taxi.setDriving(false);
 
         if (taxi.getBattery() < 30) {
-//            new ChargingRequest(taxi).join();
+            System.out.println("\nTaxi " + taxi.getId() + " has battery lower than 30%");
+            new ChargingRequest(taxi).start();
         }
-
-        taxi.setRiding(false);
     }
 }
 

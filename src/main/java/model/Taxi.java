@@ -43,7 +43,7 @@ public class Taxi {
 
     private MqttClient mqttClient;
 
-    private boolean riding;
+    private boolean driving;
 
     private boolean charging;
 
@@ -53,13 +53,15 @@ public class Taxi {
 
     private int rechargeStationId;
 
+    private long rechargeRequestTimestamp;
+
     public Taxi(int id, int port) {
         this.id = id;
         this.port = port;
         this.ip = "localhost";
         this.battery = 100;
         this.restClient = Client.create();
-        this.riding = false;
+        this.driving = false;
         this.charging = false;
         this.rechargeStationId = -1;
     }
@@ -88,8 +90,8 @@ public class Taxi {
         return requestIdTaken;
     }
 
-    public boolean isRiding() {
-        return riding;
+    public boolean isDriving() {
+        return driving;
     }
 
     public boolean isCharging() {
@@ -104,14 +106,18 @@ public class Taxi {
         return topic;
     }
 
+    public long getRechargeRequestTimestamp() {
+        return rechargeRequestTimestamp;
+    }
+
     public void setStartPos(Point startPos) {
         this.startPos = startPos;
         System.out.println("Taxi " + id + " new starting position " + startPos);
     }
-    public void setRiding(boolean riding) {
-        this.riding = riding;
-        if (riding) {
-            System.out.println("Taxi " + id + " is riding");
+    public void setDriving(boolean driving) {
+        this.driving = driving;
+        if (driving) {
+            System.out.println("Taxi " + id + " is driving");
         } else {
             System.out.println("Taxi " + id + " has finished the ride");
         }
@@ -133,6 +139,10 @@ public class Taxi {
 
     public void setRechargeStationId(int rechargeStationId) {
         this.rechargeStationId = rechargeStationId;
+    }
+
+    public void setRechargeRequestTimestamp(long rechargeRequestTimestamp) {
+        this.rechargeRequestTimestamp = rechargeRequestTimestamp;
     }
 
     @Override
@@ -218,10 +228,10 @@ public class Taxi {
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                if (!riding && !charging) {
+                if (!driving && !charging) {
                     new HandleElection(taxi, rideRequest).start();
                 } else {
-                    System.out.println("Taxi " + id + " is already riding or charging");
+                    System.out.println("Taxi " + id + " is already driving or charging");
                 }
             }
 

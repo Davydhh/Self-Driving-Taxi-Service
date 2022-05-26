@@ -32,7 +32,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                              StreamObserver<Taxi.ElectionResponseMessage> responseObserver) {
         Taxi.RideRequestMessage rideRequest = electionRequest.getRideRequest();
 
-        System.out.println("Taxi " + taxi.getId() + " has received election from " +
+        System.out.println("\nTaxi " + taxi.getId() + " has received election from " +
                 "Taxi " + electionRequest.getTaxiId() + " about request " + rideRequest.getId());
 
         Taxi.ElectionResponseMessage response;
@@ -43,13 +43,13 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                     " from Taxi " + electionRequest.getTaxiId() + " that is from another district");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
-        } else if ((taxi.isRiding() && taxi.getRequestIdTaken() != rideRequest.getId()) || taxi.isCharging()) {
-            System.out.println("Taxi " + taxi.getId() + " is already riding but for request + " + taxi.getRequestIdTaken() +
+        } else if ((taxi.isDriving() && taxi.getRequestIdTaken() != rideRequest.getId()) || taxi.isCharging()) {
+            System.out.println("Taxi " + taxi.getId() + " is already driving but for request + " + taxi.getRequestIdTaken() +
                     " or is charging");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
-        } else if (taxi.isRiding() && taxi.getRequestIdTaken() == rideRequest.getId()) {
-            System.out.println("Taxi " + taxi.getId() + " is already riding for request + " + taxi.getRequestIdTaken());
+        } else if (taxi.isDriving() && taxi.getRequestIdTaken() == rideRequest.getId()) {
+            System.out.println("Taxi " + taxi.getId() + " is already driving for request " + taxi.getRequestIdTaken());
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(false).build();
         } else {
@@ -121,15 +121,19 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
         int senderTaxiId = chargingRequest.getTaxiId();
         int stationId = chargingRequest.getStationId();
 
-        System.out.println("Taxi " + taxi.getId() + " has received charging request from Taxi " + senderTaxiId +
+        Taxi.ChargingResponseMessage response;
+
+        System.out.println("\nTaxi " + taxi.getId() + " has received charging request from Taxi " + senderTaxiId +
                 " about station " + chargingRequest.getStationId());
 
         if (taxi.isCharging() && taxi.getRechargeStationId() == stationId) {
             System.out.println("Taxi " + taxi.getId() + " is just charging on station " + stationId);
-            //TODO: Accoda la richiesta
+
+            waitChargingFinish(responseObserver, stationId);
         } else if (taxi.isCharging() && taxi.getRechargeStationId() != stationId) {
             System.out.println("Taxi " + taxi.getId() + " is charging but on station " + stationId);
-            Taxi.ChargingResponseMessage response = Taxi.ChargingResponseMessage.newBuilder()
+
+            response = Taxi.ChargingResponseMessage.newBuilder()
                     .setOk(true)
                     .build();
             responseObserver.onNext(response);
@@ -137,14 +141,47 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
         } else if (!taxi.isCharging() && taxi.getRechargeStationId() == stationId) {
             System.out.println("Taxi " + taxi.getId() + " is not charging but want charging in " +
                     "the same station " + stationId);
-            //TODO: Accoda la richiesta
+
+            if (taxi.getRechargeRequestTimestamp() < chargingRequest.getTimestamp()) {
+                waitChargingFinish(responseObserver, stationId);
+            } else {
+                response = Taxi.ChargingResponseMessage.newBuilder()
+                        .setOk(true)
+                        .build();
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+            }
         } else {
             System.out.println("Taxi " + taxi.getId() + " is not charging on station " + stationId);
-            Taxi.ChargingResponseMessage response = Taxi.ChargingResponseMessage.newBuilder()
+
+            response = Taxi.ChargingResponseMessage.newBuilder()
                     .setOk(true)
                     .build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
+        }
+    }
+
+    private void waitChargingFinish(StreamObserver<Taxi.ChargingResponseMessage> responseObserver, int stationId) {
+        Taxi.ChargingResponseMessage response;
+        while (taxi.isCharging()) {
+            synchronized (taxi) {
+                try {
+                    taxi.wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            if (!taxi.isCharging()) {
+                System.out.println("\nTaxi " + taxi.getId() + " is not charging anymore on " +
+                        "station " + stationId);
+                response = Taxi.ChargingResponseMessage.newBuilder()
+                        .setOk(true)
+                        .build();
+                responseObserver.onNext(response);
+                responseObserver.onCompleted();
+            }
         }
     }
 }

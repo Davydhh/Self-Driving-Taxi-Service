@@ -54,7 +54,7 @@ public class HandleElection extends Thread {
         List<TaxiBean> taxiList = taxi.getOtherTaxis();
 
         if (taxiList.isEmpty()) {
-            taxi.setRiding(true);
+            taxi.setDriving(true);
             taxi.setRequestIdTaken(request.getId());
             taxi.notify();
         } else {
@@ -78,7 +78,7 @@ public class HandleElection extends Thread {
                                 okCounter += 1;
 
                                 if (okCounter == taxiList.size()) {
-                                    taxi.setRiding(true);
+                                    taxi.setDriving(true);
                                     taxi.setRequestIdTaken(request.getId());
                                     taxi.notifyAll();
                                 }

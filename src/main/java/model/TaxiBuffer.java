@@ -22,7 +22,6 @@ public class TaxiBuffer implements Buffer {
             averagesMeasurements.add(new Measurement(measurement.getId(), measurement.getType(),
                     sum/windowLength, System.currentTimeMillis()));
             measurements = measurements.subList(windowLength / 2, windowLength);
-
         } else {
             measurements.add(measurement);
         }

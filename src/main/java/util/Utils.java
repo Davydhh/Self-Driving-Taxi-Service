@@ -17,7 +17,7 @@ public class Utils {
         } else if (x <= 4 && y >= 5) {
             return "seta/smartcity/rides/district2";
         } else if (x >= 5 && y <= 4){
-            return "seta/smartcity/rides/district2";
+            return "seta/smartcity/rides/district3";
         } else {
             return "seta/smartcity/rides/district4";
         }

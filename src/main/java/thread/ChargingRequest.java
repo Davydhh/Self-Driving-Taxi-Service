@@ -35,6 +35,7 @@ public class ChargingRequest extends Thread {
                 .build();
 
         taxi.setRechargeStationId(station.getId());
+        taxi.setRechargeRequestTimestamp(Utils.getCurrentTimestamp());
 
         new HandleCharging(taxi, station).start();
 
