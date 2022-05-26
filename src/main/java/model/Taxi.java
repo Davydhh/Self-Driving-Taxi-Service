@@ -228,10 +228,11 @@ public class Taxi {
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                if (!driving && !charging) {
+                if (!driving && !charging && rechargeStationId == -1) {
                     new HandleElection(taxi, rideRequest).start();
                 } else {
-                    System.out.println("Taxi " + id + " is already driving or charging");
+                    System.out.println("Taxi " + id + " is already driving or charging or in " +
+                            "mutual exclusion for charging");
                 }
             }
 

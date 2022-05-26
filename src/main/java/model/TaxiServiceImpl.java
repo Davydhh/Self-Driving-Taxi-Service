@@ -4,6 +4,7 @@ import io.grpc.stub.StreamObserver;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi;
 import seta.proto.taxi.TaxiServiceGrpc.TaxiServiceImplBase;
+import thread.PendingChargingRequest;
 import util.Utils;
 
 import java.awt.*;
@@ -129,7 +130,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
         if (taxi.isCharging() && taxi.getRechargeStationId() == stationId) {
             System.out.println("Taxi " + taxi.getId() + " is just charging on station " + stationId);
 
-            waitChargingFinish(responseObserver, stationId);
+            new PendingChargingRequest(taxi, responseObserver, stationId).start();
         } else if (taxi.isCharging() && taxi.getRechargeStationId() != stationId) {
             System.out.println("Taxi " + taxi.getId() + " is charging but on station " + stationId);
 
@@ -145,7 +146,8 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
             if (taxi.getRechargeRequestTimestamp() < chargingRequest.getTimestamp()) {
                 System.out.println("Taxi " + taxi.getId() + " has timestamp " + taxi.getRechargeRequestTimestamp() +
                         "lesser than Taxi " + chargingRequest.getTaxiId() + " timestamp " + chargingRequest.getTimestamp());
-                waitChargingFinish(responseObserver, stationId);
+
+                new PendingChargingRequest(taxi, responseObserver, stationId).start();
             } else {
                 System.out.println("Taxi " + taxi.getId() + " has timestamp " + taxi.getRechargeRequestTimestamp() +
                         "greater than Taxi " + chargingRequest.getTaxiId() + " timestamp " + chargingRequest.getTimestamp());
@@ -163,29 +165,6 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                     .build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        }
-    }
-
-    private void waitChargingFinish(StreamObserver<Taxi.ChargingResponseMessage> responseObserver, int stationId) {
-        Taxi.ChargingResponseMessage response;
-        while (taxi.isCharging()) {
-            synchronized (taxi) {
-                try {
-                    taxi.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            if (!taxi.isCharging()) {
-                System.out.println("\nTaxi " + taxi.getId() + " is not charging anymore on " +
-                        "station " + stationId);
-                response = Taxi.ChargingResponseMessage.newBuilder()
-                        .setOk(true)
-                        .build();
-                responseObserver.onNext(response);
-                responseObserver.onCompleted();
-            }
         }
     }
 }

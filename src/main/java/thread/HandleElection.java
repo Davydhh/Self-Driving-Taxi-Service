@@ -34,7 +34,7 @@ public class HandleElection extends Thread {
 
         double distance = getDistance(request.getStartPos(), taxi.getStartPos());
 
-        new HandleRide(taxi, request, distance).start();
+        new HandleRide(taxi, request).start();
 
         RideRequestMessage rideRequest = RideRequestMessage.newBuilder()
                         .setId(request.getId())

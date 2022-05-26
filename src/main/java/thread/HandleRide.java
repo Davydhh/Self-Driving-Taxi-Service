@@ -2,18 +2,16 @@ package thread;
 
 import model.Taxi;
 import rest.beans.RideRequest;
+import util.Utils;
 
 public class HandleRide extends Thread {
     private final Taxi taxi;
 
     private final RideRequest request;
 
-    private final double distance;
-
-    public HandleRide(Taxi taxi, RideRequest request, double distance) {
+    public HandleRide(Taxi taxi, RideRequest request) {
         this.taxi = taxi;
         this.request = request;
-        this.distance = distance;
     }
 
     @Override
@@ -36,20 +34,19 @@ public class HandleRide extends Thread {
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }
-            } else {
-                System.out.println("Taxi " + taxi.getId() + " is just driving for request " + taxi.getRequestIdTaken());
             }
         }
     }
 
     private void takeRequest() throws InterruptedException {
+        double distance = Utils.getDistance(taxi.getStartPos(), request.getEndPos());
         Thread.sleep(5000);
         taxi.setStartPos(request.getEndPos());
         taxi.subMqttTopic();
         taxi.setBattery(taxi.getBattery() - (int) Math.round(distance));
         taxi.setDriving(false);
 
-        if (taxi.getBattery() < 30) {
+        if (taxi.getBattery() < 95) {
             System.out.println("\nTaxi " + taxi.getId() + " has battery lower than 30%");
             new ChargingRequest(taxi).start();
         }
