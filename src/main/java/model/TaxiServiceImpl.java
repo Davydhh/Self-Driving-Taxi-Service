@@ -44,7 +44,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
         } else if ((taxi.isDriving() && taxi.getRequestIdTaken() != rideRequest.getId()) || taxi.isCharging()) {
-            System.out.println("Taxi " + taxi.getId() + " is already driving but for request + " + taxi.getRequestIdTaken() +
+            System.out.println("Taxi " + taxi.getId() + " is already driving but for request " + taxi.getRequestIdTaken() +
                     " or is charging");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
@@ -143,8 +143,12 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                     "the same station " + stationId);
 
             if (taxi.getRechargeRequestTimestamp() < chargingRequest.getTimestamp()) {
+                System.out.println("Taxi " + taxi.getId() + " has timestamp " + taxi.getRechargeRequestTimestamp() +
+                        "lesser than Taxi " + chargingRequest.getTaxiId() + " timestamp " + chargingRequest.getTimestamp());
                 waitChargingFinish(responseObserver, stationId);
             } else {
+                System.out.println("Taxi " + taxi.getId() + " has timestamp " + taxi.getRechargeRequestTimestamp() +
+                        "greater than Taxi " + chargingRequest.getTaxiId() + " timestamp " + chargingRequest.getTimestamp());
                 response = Taxi.ChargingResponseMessage.newBuilder()
                         .setOk(true)
                         .build();
