@@ -6,6 +6,7 @@ import io.grpc.stub.StreamObserver;
 import model.ChargingStation;
 import model.ChargingStations;
 import model.Taxi;
+import model.TaxiState;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi.ChargingRequestMessage;
 import seta.proto.taxi.TaxiServiceGrpc;
@@ -59,7 +60,7 @@ public class ChargingRequest extends Thread {
                             okCounter += 1;
 
                             if (okCounter == taxiList.size()) {
-                                taxi.setCharging(true);
+                                taxi.setState(TaxiState.CHARGING);
                                 taxi.getChargingLock().notifyAll();
                             }
                         }

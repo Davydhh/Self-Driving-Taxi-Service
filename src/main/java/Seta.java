@@ -14,7 +14,7 @@ public class Seta {
         //brew services start mosquitto
 
         try {
-            client = new MqttClient(broker, clientId);
+            client = new MqttClient(broker, clientId, null);
             MqttConnectOptions connOpts = new MqttConnectOptions();
             connOpts.setCleanSession(true);
 

@@ -4,12 +4,14 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import model.Taxi;
+import model.TaxiState;
 import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi.ElectionRequestMessage;
 import seta.proto.taxi.Taxi.ElectionResponseMessage;
 import seta.proto.taxi.Taxi.RideRequestMessage;
 import seta.proto.taxi.TaxiServiceGrpc;
+import util.Utils;
 
 import java.util.List;
 
@@ -34,69 +36,83 @@ public class HandleElection extends Thread {
 
         double distance = getDistance(request.getStartPos(), taxi.getStartPos());
 
-        new HandleRide(taxi, request).start();
-
         RideRequestMessage rideRequest = RideRequestMessage.newBuilder()
-                        .setId(request.getId())
-                        .setStartX(request.getStartPos().getX())
-                        .setStartY(request.getStartPos().getY())
-                        .setEndX(request.getEndPos().getX())
-                        .setEndY(request.getEndPos().getY())
-                        .build();
+                .setId(request.getId())
+                .setStartX(request.getStartPos().getX())
+                .setStartY(request.getStartPos().getY())
+                .setEndX(request.getEndPos().getX())
+                .setEndY(request.getEndPos().getY())
+                .build();
 
         ElectionRequestMessage electionRequest = ElectionRequestMessage.newBuilder()
-                        .setTaxiId(taxi.getId())
-                        .setTaxiBattery(taxi.getBattery())
-                        .setTaxiDistance(distance)
-                        .setRideRequest(rideRequest)
-                        .build();
+                .setTaxiId(taxi.getId())
+                .setTaxiBattery(taxi.getBattery())
+                .setTaxiDistance(distance)
+                .setRideRequest(rideRequest)
+                .build();
 
         List<TaxiBean> taxiList = taxi.getOtherTaxis();
 
         if (taxiList.isEmpty()) {
-            taxi.setDriving(true);
+            System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
+            taxi.setState(TaxiState.BUSY);
             taxi.setRequestIdTaken(request.getId());
-            taxi.getDrivingLock().notifyAll();
+            taxi.completeRide(request.getEndPos());
         } else {
-            for (TaxiBean t : taxiList) {
-                final ManagedChannel channel =
-                        ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-                System.out.println("Taxi " + taxi.getId() + " send election to taxi " + t.getId() + " about request " + request.getId());
-                TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
+            synchronized (taxi.getOtherTaxisLock()) {
+                for (TaxiBean t : taxiList) {
+                    final ManagedChannel channel =
+                            ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
+                    System.out.println("Taxi " + taxi.getId() + " send election to taxi " + t.getId() + " about request " + request.getId());
+                    TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
 
-                stub.sendElection(electionRequest, new StreamObserver<ElectionResponseMessage>() {
-                    @Override
-                    public void onNext(ElectionResponseMessage value) {
-                        if (!value.getOk()) {
-                            System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
-                                    "Taxi " + t.getId() + " about request " + request.getId());
-                        } else {
-                            System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
-                                    + " about request " + request.getId());
+                    stub.sendElection(electionRequest, new StreamObserver<ElectionResponseMessage>() {
+                        @Override
+                        public void onNext(ElectionResponseMessage value) {
+                            if (!value.getOk()) {
+                                System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
+                                        "Taxi " + t.getId() + " about request " + request.getId());
+                            } else {
+                                System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
+                                        + " about request " + request.getId());
 
-                            synchronized (taxi.getDrivingLock()) {
-                                okCounter += 1;
+                                synchronized (taxi.getDrivingLock()) {
+                                    okCounter += 1;
 
-                                if (okCounter == taxiList.size()) {
-                                    taxi.setDriving(true);
-                                    taxi.setRequestIdTaken(request.getId());
-                                    taxi.getDrivingLock().notifyAll();
+                                    if (okCounter == taxiList.size()) {
+                                        taxi.setState(TaxiState.BUSY);
+                                        taxi.setRequestIdTaken(request.getId());
+                                        taxi.getDrivingLock().notifyAll();
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    @Override
-                    public void onError(Throwable t) {
-                        t.printStackTrace();
-                        System.exit(0);
-                    }
+                        @Override
+                        public void onError(Throwable t) {
+                            t.printStackTrace();
+                            System.exit(0);
+                        }
 
-                    @Override
-                    public void onCompleted() {
-                        channel.shutdownNow();
-                    }
-                });
+                        @Override
+                        public void onCompleted() {
+                            channel.shutdownNow();
+                        }
+                    });
+                }
+            }
+        }
+
+        synchronized (taxi.getDrivingLock()) {
+            try {
+                taxi.getDrivingLock().wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+
+            if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == request.getId()) {
+                System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
+                taxi.completeRide(request.getEndPos());
             }
         }
     }

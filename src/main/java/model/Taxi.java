@@ -14,8 +14,10 @@ import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.TaxiServiceGrpc;
 import simulator.PM10Simulator;
+import thread.ChargingRequest;
 import thread.HandleElection;
 import thread.TaxiGrpcServer;
+import util.Utils;
 
 import javax.xml.bind.annotation.XmlRootElement;
 import java.awt.*;
@@ -45,13 +47,11 @@ public class Taxi {
 
     private MqttClient mqttClient;
 
+    private TaxiState state;
+
     private final Object drivingLock;
 
-    private boolean driving;
-
     private final Object chargingLock;
-
-    private boolean charging;
 
     private String topic;
 
@@ -73,8 +73,7 @@ public class Taxi {
         this.ip = "localhost";
         this.battery = 100;
         this.restClient = Client.create();
-        this.driving = false;
-        this.charging = false;
+        this.state = TaxiState.FREE;
         this.rechargeStationId = -1;
         this.rides = 0;
         this.drivingLock = new Object();
@@ -82,6 +81,18 @@ public class Taxi {
         this.batteryLock = new Object();
         this.otherTaxisLock = new Object();
         this.ridesLock = new Object();
+    }
+
+    public TaxiState getState() {
+        synchronized (state) {
+            return state;
+        }
+    }
+
+    public void setState(TaxiState state) {
+        synchronized (state) {
+            this.state = state;
+        }
     }
 
     public int getId() {
@@ -108,18 +119,6 @@ public class Taxi {
 
     public int getRequestIdTaken() {
         return requestIdTaken;
-    }
-
-    public boolean isDriving() {
-        synchronized (drivingLock) {
-            return driving;
-        }
-    }
-
-    public boolean isCharging() {
-        synchronized (chargingLock) {
-            return charging;
-        }
     }
 
     public int getRechargeStationId() {
@@ -170,22 +169,6 @@ public class Taxi {
         this.startPos = startPos;
         System.out.println("Taxi " + id + " new starting position " + startPos);
     }
-    public void setDriving(boolean driving) {
-        synchronized (drivingLock) {
-            this.driving = driving;
-            if (driving) {
-                System.out.println("Taxi " + id + " is driving");
-            } else {
-                System.out.println("Taxi " + id + " has finished the ride");
-            }
-        }
-    }
-
-    public void setCharging(boolean charging) {
-        synchronized (chargingLock) {
-            this.charging = charging;
-        }
-    }
 
     public void setBattery(int battery) {
         synchronized (batteryLock) {
@@ -226,6 +209,32 @@ public class Taxi {
         return Objects.hash(id);
     }
 
+    public void completeRide(Point endPoint) {
+        System.out.println("Handling ride...");
+        double distance = Utils.getDistance(startPos, endPoint);
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+        startPos = endPoint;
+        System.out.println("New position: " + startPos);
+        subMqttTopic();
+        battery -= (int) Math.round(distance);
+        System.out.println("Battery level: " + battery + "%");
+        requestIdTaken = -1;
+        incrementRides();
+
+        if (battery < 30) {
+            System.out.println("\nTaxi " + id + " has battery lower than 30%");
+            new ChargingRequest(this).start();
+        }
+
+        setState(TaxiState.FREE);
+        System.out.println("Request completed");
+    }
+
     private void register(TaxiBean taxiBean, String serverAddress) {
         ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean);
         if (response != null && response.getStatus() == 200) {
@@ -263,7 +272,7 @@ public class Taxi {
         String mqttClientId = MqttClient.generateClientId();
 
         try {
-            mqttClient = new MqttClient(broker, mqttClientId);
+            mqttClient = new MqttClient(broker, mqttClientId, null);
         } catch (MqttException ex) {
             ex.printStackTrace();
             System.out.println("Error in mqtt connection creation, exit");
@@ -296,7 +305,7 @@ public class Taxi {
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                if (!driving && !charging && rechargeStationId == -1) {
+                if (getState() == TaxiState.FREE && rechargeStationId == -1) {
                     new HandleElection(taxi, rideRequest).start();
                 } else {
                     System.out.println("Taxi " + id + " is already driving or charging or in " +
@@ -369,7 +378,9 @@ public class Taxi {
     }
 
     public List<TaxiBean> getOtherTaxis() {
-        return otherTaxis;
+        synchronized (otherTaxisLock) {
+            return otherTaxis;
+        }
     }
 
     private void sendToOtherTaxis() {

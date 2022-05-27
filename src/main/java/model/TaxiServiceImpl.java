@@ -43,12 +43,12 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                     " from Taxi " + electionRequest.getTaxiId() + " that is from another district");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
-        } else if ((taxi.isDriving() && taxi.getRequestIdTaken() != rideRequest.getId()) || taxi.isCharging()) {
+        } else if ((taxi.getState() != TaxiState.FREE && taxi.getRequestIdTaken() != rideRequest.getId())) {
             System.out.println("Taxi " + taxi.getId() + " is already driving but for request " + taxi.getRequestIdTaken() +
                     " or is charging");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
-        } else if (taxi.isDriving() && taxi.getRequestIdTaken() == rideRequest.getId()) {
+        } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == rideRequest.getId()) {
             System.out.println("Taxi " + taxi.getId() + " is already driving for request " + taxi.getRequestIdTaken());
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(false).build();
@@ -79,13 +79,13 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
                 if (currentTaxiBattery > requestTaxiBattery) {
                     System.out.println("Taxi " + taxi.getId() + " has better battery (" + currentTaxiBattery +
-                            ") than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
+                            "%) than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
                             + " about request " + rideRequest.getId());
 
                     response = Taxi.ElectionResponseMessage.newBuilder().setOk(false).build();
                 } else if (currentTaxiBattery < requestTaxiBattery) {
                     System.out.println("Taxi " + taxi.getId() + " has worse battery (" + currentTaxiBattery +
-                            ") than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
+                            "%) than Taxi " + electionRequest.getTaxiId() + " (" + requestTaxiBattery + ")"
                             + " about request " + rideRequest.getId());
 
                     response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
@@ -126,11 +126,11 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
         System.out.println("\nTaxi " + taxi.getId() + " has received charging request from Taxi " + senderTaxiId +
                 " about station " + chargingRequest.getStationId());
 
-        if (taxi.isCharging() && taxi.getRechargeStationId() == stationId) {
+        if (taxi.getState() == TaxiState.CHARGING && taxi.getRechargeStationId() == stationId) {
             System.out.println("Taxi " + taxi.getId() + " is just charging on station " + stationId);
 
             waitUntilChargingCompleted(responseObserver, stationId);
-        } else if (taxi.isCharging() && taxi.getRechargeStationId() != stationId) {
+        } else if (taxi.getState() == TaxiState.CHARGING && taxi.getRechargeStationId() != stationId) {
             System.out.println("Taxi " + taxi.getId() + " is charging but on station " + stationId);
 
             response = Taxi.ChargingResponseMessage.newBuilder()
@@ -138,7 +138,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                     .build();
             responseObserver.onNext(response);
             responseObserver.onCompleted();
-        } else if (!taxi.isCharging() && taxi.getRechargeStationId() == stationId) {
+        } else if (taxi.getState() != TaxiState.CHARGING && taxi.getRechargeStationId() == stationId) {
             System.out.println("Taxi " + taxi.getId() + " is not charging but want charging in " +
                     "the same station " + stationId);
 
@@ -169,17 +169,16 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
     private void waitUntilChargingCompleted(StreamObserver<Taxi.ChargingResponseMessage> responseObserver, int stationId) {
         System.out.println("Waiting for the recharge station " + stationId + " to finish ");
-        System.out.println("-------- " + taxi.isCharging());
 
         synchronized (taxi.getChargingLock()) {
-            while (taxi.isCharging()) {
+            while (taxi.getState() == TaxiState.CHARGING) {
                 try {
                     taxi.getChargingLock().wait();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
 
-                if (!taxi.isCharging()) {
+                if (taxi.getState() != TaxiState.CHARGING) {
                     System.out.println("\nTaxi " + taxi.getId() + " is not charging anymore on " +
                             "station " + stationId);
                     seta.proto.taxi.Taxi.ChargingResponseMessage response = seta.proto.taxi.Taxi.ChargingResponseMessage.newBuilder()
