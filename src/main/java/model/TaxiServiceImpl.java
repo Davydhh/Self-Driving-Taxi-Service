@@ -16,11 +16,11 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
         this.taxi = taxi;
     }
 
-    public synchronized void addTaxi(Taxi.TaxiMessage message,
+    public void addTaxi(Taxi.TaxiMessage message,
                                      StreamObserver<Taxi.AddTaxiResponseMessage> responseObserver) {
         TaxiBean taxiBean = new TaxiBean(message.getId(), message.getPort(), message.getIp());
+        taxi.addTaxi(taxiBean);
         List<TaxiBean> taxiList = taxi.getOtherTaxis();
-        taxiList.add(taxiBean);
         System.out.println("Taxi " + taxi.getId() + " other taxis: " + taxi.getOtherTaxis());
         Taxi.AddTaxiResponseMessage response =
                 Taxi.AddTaxiResponseMessage.newBuilder().setAdded(taxiList.contains(taxiBean)).build();
@@ -170,27 +170,24 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
     private void waitUntilChargingCompleted(StreamObserver<Taxi.ChargingResponseMessage> responseObserver, int stationId) {
         System.out.println("Waiting for the recharge station " + stationId + " to finish ");
         System.out.println("-------- " + taxi.isCharging());
-        while (taxi.isCharging()) {
-            System.out.println("-------- while");
-            synchronized (taxi) {
-                System.out.println("-------- synchro");
+
+        synchronized (taxi.getChargingLock()) {
+            while (taxi.isCharging()) {
                 try {
-                    taxi.wait();
-                    System.out.println("-------- wait");
+                    taxi.getChargingLock().wait();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
-            }
 
-            System.out.println("-------- " + taxi.isCharging());
-            if (!taxi.isCharging()) {
-                System.out.println("\nTaxi " + taxi.getId() + " is not charging anymore on " +
-                        "station " + stationId);
-                seta.proto.taxi.Taxi.ChargingResponseMessage response = seta.proto.taxi.Taxi.ChargingResponseMessage.newBuilder()
-                        .setOk(true)
-                        .build();
-                responseObserver.onNext(response);
-                responseObserver.onCompleted();
+                if (!taxi.isCharging()) {
+                    System.out.println("\nTaxi " + taxi.getId() + " is not charging anymore on " +
+                            "station " + stationId);
+                    seta.proto.taxi.Taxi.ChargingResponseMessage response = seta.proto.taxi.Taxi.ChargingResponseMessage.newBuilder()
+                            .setOk(true)
+                            .build();
+                    responseObserver.onNext(response);
+                    responseObserver.onCompleted();
+                }
             }
         }
     }

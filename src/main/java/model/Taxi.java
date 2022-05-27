@@ -33,9 +33,11 @@ public class Taxi {
 
     private final String ip;
 
-    private Integer battery;
+    private int battery;
 
     private Point startPos;
+
+    private final Object otherTaxisLock;
 
     private List<TaxiBean> otherTaxis;
 
@@ -43,7 +45,11 @@ public class Taxi {
 
     private MqttClient mqttClient;
 
+    private final Object drivingLock;
+
     private boolean driving;
+
+    private final Object chargingLock;
 
     private boolean charging;
 
@@ -55,6 +61,12 @@ public class Taxi {
 
     private long rechargeRequestTimestamp;
 
+    private final Object batteryLock;
+
+    private int rides;
+
+    private final Object ridesLock;
+
     public Taxi(int id, int port) {
         this.id = id;
         this.port = port;
@@ -64,6 +76,12 @@ public class Taxi {
         this.driving = false;
         this.charging = false;
         this.rechargeStationId = -1;
+        this.rides = 0;
+        this.drivingLock = new Object();
+        this.chargingLock = new Object();
+        this.batteryLock = new Object();
+        this.otherTaxisLock = new Object();
+        this.ridesLock = new Object();
     }
 
     public int getId() {
@@ -78,8 +96,10 @@ public class Taxi {
         return ip;
     }
 
-    public Integer getBattery() {
-        return battery;
+    public int getBattery() {
+        synchronized (batteryLock) {
+            return battery;
+        }
     }
 
     public Point getStartPos() {
@@ -91,11 +111,15 @@ public class Taxi {
     }
 
     public boolean isDriving() {
-        return driving;
+        synchronized (drivingLock) {
+            return driving;
+        }
     }
 
     public boolean isCharging() {
-        return charging;
+        synchronized (chargingLock) {
+            return charging;
+        }
     }
 
     public int getRechargeStationId() {
@@ -110,26 +134,64 @@ public class Taxi {
         return rechargeRequestTimestamp;
     }
 
+    public Object getDrivingLock() {
+        return drivingLock;
+    }
+
+    public Object getChargingLock() {
+        return chargingLock;
+    }
+
+    public Object getBatteryLock() {
+        return batteryLock;
+    }
+
+    public Object getOtherTaxisLock() {
+        return otherTaxisLock;
+    }
+
+    public Object getRidesLock() {
+        return ridesLock;
+    }
+
+    public int getRides() {
+        synchronized (ridesLock) {
+            return rides;
+        }
+    }
+
+    public void incrementRides() {
+        synchronized (ridesLock) {
+            rides++;
+        }
+    }
+
     public void setStartPos(Point startPos) {
         this.startPos = startPos;
         System.out.println("Taxi " + id + " new starting position " + startPos);
     }
     public void setDriving(boolean driving) {
-        this.driving = driving;
-        if (driving) {
-            System.out.println("Taxi " + id + " is driving");
-        } else {
-            System.out.println("Taxi " + id + " has finished the ride");
+        synchronized (drivingLock) {
+            this.driving = driving;
+            if (driving) {
+                System.out.println("Taxi " + id + " is driving");
+            } else {
+                System.out.println("Taxi " + id + " has finished the ride");
+            }
         }
     }
 
     public void setCharging(boolean charging) {
-        this.charging = charging;
+        synchronized (chargingLock) {
+            this.charging = charging;
+        }
     }
 
     public void setBattery(int battery) {
-        this.battery = battery;
-        System.out.println("Battery level: " + this.battery);
+        synchronized (batteryLock) {
+            this.battery = battery;
+            System.out.println("Battery level: " + this.battery);
+        }
     }
 
     public void setRequestIdTaken(int requestIdTaken) {
@@ -143,6 +205,12 @@ public class Taxi {
 
     public void setRechargeRequestTimestamp(long rechargeRequestTimestamp) {
         this.rechargeRequestTimestamp = rechargeRequestTimestamp;
+    }
+
+    public void addTaxi(TaxiBean taxi) {
+        synchronized (otherTaxisLock) {
+            otherTaxis.add(taxi);
+        }
     }
 
     @Override

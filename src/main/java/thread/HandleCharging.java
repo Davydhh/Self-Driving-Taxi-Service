@@ -19,9 +19,9 @@ public class HandleCharging extends Thread {
         System.out.println("Waiting for receiving ok for charging request for station " + station.getId());
 
         while (!taxi.isCharging()) {
-            synchronized (taxi) {
+            synchronized (taxi.getChargingLock()) {
                 try {
-                    taxi.wait();
+                    taxi.getChargingLock().wait();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
@@ -34,7 +34,7 @@ public class HandleCharging extends Thread {
     }
 
     private void charge() {
-        synchronized (taxi) {
+        synchronized (taxi.getChargingLock()) {
             double distance = Utils.getDistance(taxi.getStartPos(), station.getPosition());
             taxi.setBattery(taxi.getBattery() - (int) Math.round(distance));
             taxi.setStartPos(station.getPosition());
@@ -50,7 +50,7 @@ public class HandleCharging extends Thread {
             taxi.setCharging(false);
             taxi.setRechargeStationId(-1);
             taxi.setBattery(100);
-            taxi.notifyAll();
+            taxi.getChargingLock().notifyAll();
         }
     }
 }

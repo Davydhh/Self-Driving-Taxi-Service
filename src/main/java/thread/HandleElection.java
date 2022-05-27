@@ -56,7 +56,7 @@ public class HandleElection extends Thread {
         if (taxiList.isEmpty()) {
             taxi.setDriving(true);
             taxi.setRequestIdTaken(request.getId());
-            taxi.notify();
+            taxi.getDrivingLock().notifyAll();
         } else {
             for (TaxiBean t : taxiList) {
                 final ManagedChannel channel =
@@ -74,13 +74,13 @@ public class HandleElection extends Thread {
                             System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
                                     + " about request " + request.getId());
 
-                            synchronized (taxi) {
+                            synchronized (taxi.getDrivingLock()) {
                                 okCounter += 1;
 
                                 if (okCounter == taxiList.size()) {
                                     taxi.setDriving(true);
                                     taxi.setRequestIdTaken(request.getId());
-                                    taxi.notifyAll();
+                                    taxi.getDrivingLock().notifyAll();
                                 }
                             }
                         }
