@@ -11,7 +11,6 @@ import seta.proto.taxi.Taxi.ElectionRequestMessage;
 import seta.proto.taxi.Taxi.ElectionResponseMessage;
 import seta.proto.taxi.Taxi.RideRequestMessage;
 import seta.proto.taxi.TaxiServiceGrpc;
-import util.Utils;
 
 import java.util.List;
 
@@ -101,18 +100,26 @@ public class HandleElection extends Thread {
                     });
                 }
             }
+
+            waitUntilReceiveAllOk();
         }
+    }
+
+    private void waitUntilReceiveAllOk() {
+        System.out.println("Taxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
 
         synchronized (taxi.getDrivingLock()) {
-            try {
-                taxi.getDrivingLock().wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            while (taxi.getState() != TaxiState.BUSY) {
+                try {
+                    taxi.getDrivingLock().wait();
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
 
-            if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == request.getId()) {
-                System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
-                taxi.completeRide(request.getEndPos());
+                if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == request.getId()) {
+                    System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
+                    taxi.completeRide(request.getEndPos());
+                }
             }
         }
     }

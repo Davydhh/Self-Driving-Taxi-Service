@@ -14,7 +14,7 @@ import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.TaxiServiceGrpc;
 import simulator.PM10Simulator;
-import thread.ChargingRequest;
+import thread.HandleCharging;
 import thread.HandleElection;
 import thread.TaxiGrpcServer;
 import util.Utils;
@@ -29,6 +29,7 @@ import java.util.Scanner;
 
 @XmlRootElement
 public class Taxi {
+
     private final int id;
 
     private final int port;
@@ -54,6 +55,8 @@ public class Taxi {
     private final Object chargingLock;
 
     private String topic;
+
+    private final Object topicLock;
 
     private int requestIdTaken;
 
@@ -81,6 +84,7 @@ public class Taxi {
         this.batteryLock = new Object();
         this.otherTaxisLock = new Object();
         this.ridesLock = new Object();
+        this.topicLock = new Object();
     }
 
     public TaxiState getState() {
@@ -89,9 +93,10 @@ public class Taxi {
         }
     }
 
-    public void setState(TaxiState state) {
-        synchronized (state) {
-            this.state = state;
+    public void setState(TaxiState value) {
+        synchronized (this.state) {
+            this.state = value;
+            System.out.println("Taxi " + id + " changed state to " + value);
         }
     }
 
@@ -126,7 +131,9 @@ public class Taxi {
     }
 
     public String getTopic() {
-        return topic;
+        synchronized (topicLock) {
+            return topic;
+        }
     }
 
     public long getRechargeRequestTimestamp() {
@@ -218,21 +225,47 @@ public class Taxi {
             e.printStackTrace();
         }
 
-        startPos = endPoint;
-        System.out.println("New position: " + startPos);
+        setStartPos(endPoint);
         subMqttTopic();
-        battery -= (int) Math.round(distance);
-        System.out.println("Battery level: " + battery + "%");
-        requestIdTaken = -1;
+        decreaseBattery((int) Math.round(distance));
+        setRequestIdTaken(-1);
         incrementRides();
 
         if (battery < 30) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
-            new ChargingRequest(this).start();
+            new HandleCharging(this).start();
         }
 
         setState(TaxiState.FREE);
         System.out.println("Request completed");
+    }
+
+    public void completeCharging(Point stationPosition) {
+        double distance = Utils.getDistance(startPos, stationPosition);
+        decreaseBattery((int) Math.round(distance));
+        setStartPos(stationPosition);
+
+        System.out.println("Taxi " + id + " is charging on station " + rechargeStationId);
+        try {
+            Thread.sleep(10000);
+        } catch (InterruptedException ex) {
+            ex.printStackTrace();
+        }
+
+        setState(TaxiState.FREE);
+        setRechargeStationId(-1);
+        setBattery(100);
+
+        synchronized (getChargingLock()) {
+            getChargingLock().notifyAll();
+        }
+    }
+
+    private void decreaseBattery(int value) {
+        synchronized (batteryLock) {
+            battery -= value;
+        }
+        System.out.println("Battery level: " + battery + "%");
     }
 
     private void register(TaxiBean taxiBean, String serverAddress) {
@@ -339,21 +372,24 @@ public class Taxi {
             newTopic = "seta/smartcity/rides/district4";
         }
 
-        if (!newTopic.equals(this.topic)) {
-            try {
-                if (topic != null) {
-                    mqttClient.unsubscribe(topic);
+        synchronized (topicLock) {
+            if (!newTopic.equals(this.topic)) {
+                try {
+                    if (topic != null) {
+                        System.out.println("Taxi " + id + " Unsubscribe from topic: " + topic);
+                        mqttClient.unsubscribe(topic);
+                    }
+                    mqttClient.subscribe(newTopic, 1);
+                    this.topic = newTopic;
+                } catch (MqttException ex) {
+                    ex.printStackTrace();
+                    mqttDisconnect();
+                    System.out.println("Error subscribing to topic " + newTopic + ", exit");
+                    System.exit(0);
                 }
-                mqttClient.subscribe(newTopic, 1);
-                this.topic = newTopic;
-            } catch (MqttException ex) {
-                ex.printStackTrace();
-                mqttDisconnect();
-                System.out.println("Error subscribing to topic " + newTopic + ", exit");
-                System.exit(0);
-            }
 
-            System.out.println("Taxi " + id + " Subscribed to topics : " + newTopic);
+                System.out.println("Taxi " + id + " Subscribed to topic : " + newTopic);
+            }
         }
     }
 
