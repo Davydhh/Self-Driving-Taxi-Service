@@ -1,6 +1,10 @@
 package util;
 
+import model.ChargingStation;
+import model.ChargingStations;
+
 import java.awt.*;
+import java.util.List;
 
 public class Utils {
     public static double getDistance(Point p1, Point p2) {
@@ -25,5 +29,23 @@ public class Utils {
 
     public static long getCurrentTimestamp() {
         return System.currentTimeMillis();
+    }
+
+    public static ChargingStation getStationsFromPosition(Point position) {
+        List<ChargingStation> chargingStations =
+                ChargingStations.getInstance().getChargingStations();
+
+        double x = position.getX();
+        double y = position.getY();
+
+        if (x <= 4 && y <= 4) {
+            return chargingStations.get(0);
+        } else if (x <= 4 && y >= 5) {
+            return chargingStations.get(1);
+        } else if (x >= 5 && y <= 4){
+            return chargingStations.get(2);
+        } else {
+            return chargingStations.get(3);
+        }
     }
 }

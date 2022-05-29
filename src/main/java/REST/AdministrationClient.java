@@ -62,7 +62,6 @@ public class AdministrationClient {
                 ex.printStackTrace();
                 scanner.next();
             }
-
         }
     }
 

@@ -40,8 +40,6 @@ public class Taxi {
 
     private Point startPos;
 
-    private final Object otherTaxisLock;
-
     private List<TaxiBean> otherTaxis;
 
     private final Client restClient;
@@ -50,13 +48,7 @@ public class Taxi {
 
     private TaxiState state;
 
-    private final Object drivingLock;
-
-    private final Object chargingLock;
-
     private String topic;
-
-    private final Object topicLock;
 
     private int requestIdTaken;
 
@@ -64,11 +56,21 @@ public class Taxi {
 
     private long rechargeRequestTimestamp;
 
-    private final Object batteryLock;
-
     private int rides;
 
+    private final Object otherTaxisLock;
+
+    private final Object topicLock;
+
+    private final Object batteryLock;
+
+    private final Object stateLock;
+
     private final Object ridesLock;
+
+    private final Object startPosLock;
+
+    private final Object chargingLock;
 
     public Taxi(int id, int port) {
         this.id = id;
@@ -79,22 +81,23 @@ public class Taxi {
         this.state = TaxiState.FREE;
         this.rechargeStationId = -1;
         this.rides = 0;
-        this.drivingLock = new Object();
-        this.chargingLock = new Object();
         this.batteryLock = new Object();
         this.otherTaxisLock = new Object();
         this.ridesLock = new Object();
         this.topicLock = new Object();
+        this.stateLock = new Object();
+        this.startPosLock = new Object();
+        this.chargingLock = new Object();
     }
 
     public TaxiState getState() {
-        synchronized (state) {
+        synchronized (stateLock) {
             return state;
         }
     }
 
     public void setState(TaxiState value) {
-        synchronized (this.state) {
+        synchronized (stateLock) {
             this.state = value;
             System.out.println("Taxi " + id + " changed state to " + value);
         }
@@ -119,7 +122,9 @@ public class Taxi {
     }
 
     public Point getStartPos() {
-        return startPos;
+        synchronized (startPosLock) {
+            return startPos;
+        }
     }
 
     public int getRequestIdTaken() {
@@ -140,24 +145,16 @@ public class Taxi {
         return rechargeRequestTimestamp;
     }
 
-    public Object getDrivingLock() {
-        return drivingLock;
-    }
-
-    public Object getChargingLock() {
-        return chargingLock;
-    }
-
-    public Object getBatteryLock() {
-        return batteryLock;
+    public Object getStateLock() {
+        return stateLock;
     }
 
     public Object getOtherTaxisLock() {
         return otherTaxisLock;
     }
 
-    public Object getRidesLock() {
-        return ridesLock;
+    public Object getChargingLock() {
+        return chargingLock;
     }
 
     public int getRides() {
@@ -173,8 +170,10 @@ public class Taxi {
     }
 
     public void setStartPos(Point startPos) {
-        this.startPos = startPos;
-        System.out.println("Taxi " + id + " new starting position " + startPos);
+        synchronized (startPosLock) {
+            this.startPos = startPos;
+            System.out.println("Taxi " + id + " new starting position " + startPos);
+        }
     }
 
     public void setBattery(int battery) {
@@ -216,31 +215,32 @@ public class Taxi {
         return Objects.hash(id);
     }
 
-    public void completeRide(Point endPoint) {
+    public void drive(RideRequest request) {
         System.out.println("Handling ride...");
-        double distance = Utils.getDistance(startPos, endPoint);
+        double distance = Utils.getDistance(startPos, request.getEndPos());
         try {
             Thread.sleep(5000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        setStartPos(endPoint);
+        setStartPos(request.getEndPos());
         subMqttTopic();
         decreaseBattery((int) Math.round(distance));
         setRequestIdTaken(-1);
         incrementRides();
+        System.out.println("Request completed");
 
         if (battery < 30) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
+            setState(TaxiState.LOW);
             new HandleCharging(this).start();
+        } else {
+            setState(TaxiState.FREE);
         }
-
-        setState(TaxiState.FREE);
-        System.out.println("Request completed");
     }
 
-    public void completeCharging(Point stationPosition) {
+    public void recharge(Point stationPosition) {
         double distance = Utils.getDistance(startPos, stationPosition);
         decreaseBattery((int) Math.round(distance));
         setStartPos(stationPosition);
@@ -252,12 +252,13 @@ public class Taxi {
             ex.printStackTrace();
         }
 
-        setState(TaxiState.FREE);
         setRechargeStationId(-1);
         setBattery(100);
+        setState(TaxiState.FREE);
 
         synchronized (getChargingLock()) {
             getChargingLock().notifyAll();
+            System.out.println("NOTIFY CHARGING FINISHED");
         }
     }
 
@@ -338,7 +339,7 @@ public class Taxi {
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                if (getState() == TaxiState.FREE && rechargeStationId == -1) {
+                if (getState() == TaxiState.FREE) {
                     new HandleElection(taxi, rideRequest).start();
                 } else {
                     System.out.println("Taxi " + id + " is already driving or charging or in " +
@@ -498,5 +499,18 @@ public class Taxi {
 
         taxi.startMqttConnection(taxi);
         taxi.subMqttTopic();
+
+        String action;
+
+        do {
+            action = scanner.nextLine();
+
+            if (action.equals("recharge")) {
+                //TODO: Handle concurrency (ex. taxi is driving, or just churging)
+                new HandleCharging(taxi).start();
+            }
+        } while (!action.equals("leave"));
+
+        //TODO: handle leave
     }
 }

@@ -23,10 +23,13 @@ public class HandleElection extends Thread {
 
     private int okCounter;
 
+    private final Object counterLock;
+
     public HandleElection(Taxi taxi, RideRequest request) {
         this.taxi = taxi;
         this.request = request;
         this.okCounter = 0;
+        this.counterLock = new Object();
     }
 
     @Override
@@ -56,7 +59,7 @@ public class HandleElection extends Thread {
             System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
             taxi.setState(TaxiState.BUSY);
             taxi.setRequestIdTaken(request.getId());
-            taxi.completeRide(request.getEndPos());
+            taxi.drive(request);
         } else {
             synchronized (taxi.getOtherTaxisLock()) {
                 for (TaxiBean t : taxiList) {
@@ -75,13 +78,13 @@ public class HandleElection extends Thread {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
                                         + " about request " + request.getId());
 
-                                synchronized (taxi.getDrivingLock()) {
+                                synchronized (counterLock) {
                                     okCounter += 1;
 
                                     if (okCounter == taxiList.size()) {
                                         taxi.setState(TaxiState.BUSY);
                                         taxi.setRequestIdTaken(request.getId());
-                                        taxi.getDrivingLock().notifyAll();
+                                        counterLock.notifyAll();
                                     }
                                 }
                             }
@@ -108,17 +111,17 @@ public class HandleElection extends Thread {
     private void waitUntilReceiveAllOk() {
         System.out.println("Taxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
 
-        synchronized (taxi.getDrivingLock()) {
+        synchronized (counterLock) {
             while (taxi.getState() != TaxiState.BUSY) {
                 try {
-                    taxi.getDrivingLock().wait();
+                    counterLock.wait();
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
 
                 if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == request.getId()) {
                     System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
-                    taxi.completeRide(request.getEndPos());
+                    taxi.drive(request);
                 }
             }
         }

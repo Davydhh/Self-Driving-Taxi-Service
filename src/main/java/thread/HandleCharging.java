@@ -20,14 +20,17 @@ public class HandleCharging extends Thread {
 
     private int okCounter;
 
+    private final Object counterLock;
+
     public HandleCharging(Taxi taxi) {
         this.taxi = taxi;
         this.okCounter = 0;
+        this.counterLock = new Object();
     }
 
     @Override
     public void run() {
-        ChargingStation station = getStationsFromPosition(taxi.getStartPos());
+        ChargingStation station = Utils.getStationsFromPosition(taxi.getStartPos());
 
         ChargingRequestMessage chargingRequest = ChargingRequestMessage.newBuilder()
                 .setTaxiId(taxi.getId())
@@ -40,80 +43,67 @@ public class HandleCharging extends Thread {
 
         List<TaxiBean> taxiList = taxi.getOtherTaxis();
 
-        for (TaxiBean t: taxiList) {
-            final ManagedChannel channel =
-                    ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            System.out.println("Taxi " + taxi.getId() + " send charging request to taxi " + t.getId() +
-                    " for station " + station.getId());
-            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
+        synchronized (counterLock) {
+            if (taxiList.isEmpty()) {
+                taxi.setState(TaxiState.CHARGING);
+                taxi.recharge(station.getPosition());
+            } else {
+                for (TaxiBean t : taxiList) {
+                    final ManagedChannel channel =
+                            ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
+                    System.out.println("Taxi " + taxi.getId() + " send charging request to taxi " + t.getId() +
+                            " for station " + station.getId());
+                    TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
 
-            stub.sendChargingRequest(chargingRequest, new StreamObserver<seta.proto.taxi.Taxi.ChargingResponseMessage>() {
-                @Override
-                public void onNext(seta.proto.taxi.Taxi.ChargingResponseMessage value) {
-                    if (value.getOk()) {
-                        System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
-                                + " about charging request for station " + station.getId());
+                    stub.sendChargingRequest(chargingRequest, new StreamObserver<seta.proto.taxi.Taxi.ChargingResponseMessage>() {
+                        @Override
+                        public void onNext(seta.proto.taxi.Taxi.ChargingResponseMessage value) {
+                            if (value.getOk()) {
+                                System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
+                                        + " about charging request for station " + station.getId());
 
-                        synchronized (taxi.getChargingLock()) {
-                            okCounter += 1;
+                                synchronized (counterLock) {
+                                    okCounter += 1;
 
-                            if (okCounter == taxiList.size()) {
-                                taxi.setState(TaxiState.CHARGING);
-                                taxi.getChargingLock().notifyAll();
+                                    if (okCounter == taxiList.size()) {
+                                        taxi.setState(TaxiState.CHARGING);
+                                        counterLock.notifyAll();
+                                    }
+                                }
                             }
                         }
-                    }
+
+                        @Override
+                        public void onError(Throwable t) {
+                            t.printStackTrace();
+                            System.exit(0);
+                        }
+
+                        @Override
+                        public void onCompleted() {
+                            channel.shutdownNow();
+                        }
+                    });
                 }
 
-                @Override
-                public void onError(Throwable t) {
-                    t.printStackTrace();
-                    System.exit(0);
-                }
-
-                @Override
-                public void onCompleted() {
-                    channel.shutdownNow();
-                }
-            });
+                waitUntilReceiveAllOk(station);
+            }
         }
-
-        waitUntilReceiveAllOk(station);
     }
 
     private void waitUntilReceiveAllOk(ChargingStation station) {
         System.out.println("Waiting for receiving ok for charging request for station " + station.getId());
 
         while (taxi.getState() != TaxiState.CHARGING) {
-            synchronized (taxi.getChargingLock()) {
-                try {
-                    taxi.getChargingLock().wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                if (taxi.getState() == TaxiState.CHARGING) {
-                    taxi.completeCharging(station.getPosition());
-                }
+            try {
+                counterLock.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
-        }
-    }
 
-    private ChargingStation getStationsFromPosition(Point position) {
-        List<ChargingStation> chargingStations =
-                ChargingStations.getInstance().getChargingStations();
-
-        double x = position.getX();
-        double y = position.getY();
-
-        if (x <= 4 && y <= 4) {
-            return chargingStations.get(0);
-        } else if (x <= 4 && y >= 5) {
-            return chargingStations.get(1);
-        } else if (x >= 5 && y <= 4){
-            return chargingStations.get(2);
-        } else {
-            return chargingStations.get(3);
+            if (taxi.getState() == TaxiState.CHARGING) {
+                taxi.recharge(station.getPosition());
+            }
         }
     }
 }

@@ -43,9 +43,12 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                     " from Taxi " + electionRequest.getTaxiId() + " that is from another district");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
-        } else if ((taxi.getState() != TaxiState.FREE && taxi.getRequestIdTaken() != rideRequest.getId())) {
-            System.out.println("Taxi " + taxi.getId() + " is already driving but for request " + taxi.getRequestIdTaken() +
-                    " or is charging");
+        } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() != rideRequest.getId()) {
+            System.out.println("Taxi " + taxi.getId() + " is already driving but for request " + taxi.getRequestIdTaken());
+
+            response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
+        } else if (taxi.getState() == TaxiState.CHARGING) {
+            System.out.println("Taxi " + taxi.getId() + " is charging");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
         } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == rideRequest.getId()) {
@@ -168,9 +171,9 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
     }
 
     private void waitUntilChargingCompleted(StreamObserver<Taxi.ChargingResponseMessage> responseObserver, int stationId) {
-        System.out.println("Waiting for the recharge station " + stationId + " to finish ");
-
         synchronized (taxi.getChargingLock()) {
+            System.out.println("\nWaiting for the recharge station " + stationId + " to finish ");
+
             while (taxi.getState() == TaxiState.CHARGING) {
                 try {
                     taxi.getChargingLock().wait();
