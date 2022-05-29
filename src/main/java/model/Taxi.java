@@ -237,6 +237,9 @@ public class Taxi {
             new HandleCharging(this).start();
         } else {
             setState(TaxiState.FREE);
+            synchronized (getStateLock()) {
+                getStateLock().notifyAll();
+            }
         }
     }
 
@@ -258,7 +261,10 @@ public class Taxi {
 
         synchronized (getChargingLock()) {
             getChargingLock().notifyAll();
-            System.out.println("NOTIFY CHARGING FINISHED");
+        }
+
+        synchronized (getStateLock()) {
+            getStateLock().notifyAll();
         }
     }
 
@@ -506,8 +512,31 @@ public class Taxi {
             action = scanner.nextLine();
 
             if (action.equals("recharge")) {
-                //TODO: Handle concurrency (ex. taxi is driving, or just churging)
-                new HandleCharging(taxi).start();
+                synchronized (taxi.getStateLock()) {
+                    if (taxi.getState() == TaxiState.FREE) {
+                        if (taxi.getBattery() < 100) {
+                            new HandleCharging(taxi).start();
+                        } else {
+                            System.out.println("Battery already full!");
+                        }
+                    } else {
+                        while (taxi.getState() != TaxiState.FREE) {
+                            try {
+                                taxi.getStateLock().wait();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+
+                            if (taxi.getState() == TaxiState.FREE) {
+                                if (taxi.getBattery() < 100) {
+                                    new HandleCharging(taxi).start();
+                                } else {
+                                    System.out.println("Battery already full!");
+                                }
+                            }
+                        }
+                    }
+                }
             }
         } while (!action.equals("leave"));
 
