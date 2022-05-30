@@ -1,11 +1,16 @@
 package thread;
 
 import com.google.gson.Gson;
-import org.eclipse.paho.client.mqttv3.*;
+import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttException;
+import org.eclipse.paho.client.mqttv3.MqttMessage;
 import rest.beans.RideRequest;
 import util.Utils;
 
 import java.awt.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 
 public class RideRequestGenerator extends Thread {
@@ -15,10 +20,13 @@ public class RideRequestGenerator extends Thread {
 
     private final MqttClient client;
 
-    public RideRequestGenerator(MqttClient client) {
+    private final Map<String, List<RideRequest>> requests;
+
+    public RideRequestGenerator(MqttClient client, Map<String, List<RideRequest>> requests) {
         this.client = client;
         this.requestId = 0;
-        random = new Random();
+        this.random = new Random();
+        this.requests = requests;
     }
 
     @Override
@@ -56,15 +64,15 @@ public class RideRequestGenerator extends Thread {
 
         try {
             client.publish(pubTopic, message);
-        } catch (MqttException me ) {
-            System.out.println("reason " + me.getReasonCode());
-            System.out.println("msg " + me.getMessage());
-            System.out.println("loc " + me.getLocalizedMessage());
-            System.out.println("cause " + me.getCause());
-            System.out.println("excep " + me);
-            me.printStackTrace();
+            requests.computeIfAbsent(pubTopic, r -> new ArrayList<>()).add(request);
+        } catch (MqttException e) {
+            System.out.println("reason " + e.getReasonCode());
+            System.out.println("msg " + e.getMessage());
+            System.out.println("loc " + e.getLocalizedMessage());
+            System.out.println("cause " + e.getCause());
+            System.out.println("excep " + e);
+            e.printStackTrace();
         }
         System.out.println("Message published to topic " + pubTopic);
-        System.out.println();
     }
 }

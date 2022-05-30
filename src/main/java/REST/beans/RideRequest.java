@@ -2,6 +2,7 @@ package rest.beans;
 
 import javax.xml.bind.annotation.XmlRootElement;
 import java.awt.*;
+import java.util.Objects;
 
 @XmlRootElement
 public class RideRequest {
@@ -29,5 +30,18 @@ public class RideRequest {
 
     public Point getEndPos() {
         return endPos;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        RideRequest that = (RideRequest) o;
+        return id == that.id;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
     }
 }

@@ -96,13 +96,6 @@ public class Taxi {
         }
     }
 
-    public void setState(TaxiState value) {
-        synchronized (stateLock) {
-            this.state = value;
-            System.out.println("Taxi " + id + " changed state to " + value);
-        }
-    }
-
     public int getId() {
         return id;
     }
@@ -163,9 +156,24 @@ public class Taxi {
         }
     }
 
-    public void incrementRides() {
-        synchronized (ridesLock) {
-            rides++;
+    public void setState(TaxiState value) {
+        synchronized (stateLock) {
+            this.state = value;
+            System.out.println("Taxi " + id + " changed state to " + value);
+        }
+
+        if (value == TaxiState.FREE) {
+            MqttMessage message = new MqttMessage(getTopic().getBytes());
+            try {
+                mqttClient.publish("seta/smartcity/taxis/free", message);
+            } catch (MqttException e) {
+                System.out.println("reason " + e.getReasonCode());
+                System.out.println("msg " + e.getMessage());
+                System.out.println("loc " + e.getLocalizedMessage());
+                System.out.println("cause " + e.getCause());
+                System.out.println("excep " + e);
+                e.printStackTrace();
+            }
         }
     }
 
@@ -196,12 +204,6 @@ public class Taxi {
         this.rechargeRequestTimestamp = rechargeRequestTimestamp;
     }
 
-    public void addTaxi(TaxiBean taxi) {
-        synchronized (otherTaxisLock) {
-            otherTaxis.add(taxi);
-        }
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -213,6 +215,18 @@ public class Taxi {
     @Override
     public int hashCode() {
         return Objects.hash(id);
+    }
+
+    public void incrementRides() {
+        synchronized (ridesLock) {
+            rides++;
+        }
+    }
+
+    public void addTaxi(TaxiBean taxi) {
+        synchronized (otherTaxisLock) {
+            otherTaxis.add(taxi);
+        }
     }
 
     public void drive(RideRequest request) {
@@ -347,6 +361,17 @@ public class Taxi {
 
                 if (getState() == TaxiState.FREE) {
                     new HandleElection(taxi, rideRequest).start();
+
+                    try {
+                        mqttClient.publish("seta/smartcity/rides/handled", message);
+                    } catch (MqttException e) {
+                        System.out.println("reason " + e.getReasonCode());
+                        System.out.println("msg " + e.getMessage());
+                        System.out.println("loc " + e.getLocalizedMessage());
+                        System.out.println("cause " + e.getCause());
+                        System.out.println("excep " + e);
+                        e.printStackTrace();
+                    }
                 } else {
                     System.out.println("Taxi " + id + " is already driving or charging or in " +
                             "mutual exclusion for charging");
@@ -360,7 +385,6 @@ public class Taxi {
             public void deliveryComplete(IMqttDeliveryToken token) {
                 // Not used
             }
-
         });
     }
 
@@ -463,7 +487,7 @@ public class Taxi {
         Scanner scanner = new Scanner(System.in);
 
         System.out.println("Creating taxi");
-        System.out.println("Insert the id (number)");
+        System.out.println("Insert the id");
         int id = -1;
         try {
             id = scanner.nextInt();
@@ -473,7 +497,7 @@ public class Taxi {
             System.exit(0);
         }
 
-        System.out.println("Insert the port (number)");
+        System.out.println("Insert the port");
         int port = -1;
         try {
             port = scanner.nextInt();
