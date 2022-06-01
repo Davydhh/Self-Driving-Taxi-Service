@@ -4,5 +4,7 @@ public enum TaxiState {
     FREE,
     BUSY,
     CHARGING,
-    LOW
+    LOW,
+    LEAVING,
+    HANDLING
 }

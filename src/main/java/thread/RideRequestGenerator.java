@@ -45,6 +45,7 @@ public class RideRequestGenerator extends Thread {
 
     private void generateRequest() {
         requestId += 1;
+        System.out.println("------------------------------");
         System.out.println("Generating request " + requestId);
         Point startPos;
         Point endPos;
@@ -63,8 +64,9 @@ public class RideRequestGenerator extends Thread {
         System.out.println("Publishing message: " + payload);
 
         try {
-            client.publish(pubTopic, message);
             requests.computeIfAbsent(pubTopic, r -> new ArrayList<>()).add(request);
+            client.publish(pubTopic, message);
+            System.out.println("Seta requests: " + requests);
         } catch (MqttException e) {
             System.out.println("reason " + e.getReasonCode());
             System.out.println("msg " + e.getMessage());

@@ -68,6 +68,7 @@ public class Seta {
                         if (requestsByTopic != null && !requestsByTopic.isEmpty()) {
                             requestsByTopic.remove(rideRequest);
                             System.out.println("\nRequest " + rideRequest.getId() + " removed");
+                            System.out.println("Seta requests: " + requests);
                         }
                     }
                 }

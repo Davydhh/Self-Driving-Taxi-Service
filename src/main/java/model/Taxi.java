@@ -22,15 +22,16 @@ import util.Utils;
 import javax.xml.bind.annotation.XmlRootElement;
 import java.awt.*;
 import java.net.URL;
-import java.util.InputMismatchException;
 import java.util.List;
-import java.util.Objects;
-import java.util.Scanner;
+import java.util.Queue;
+import java.util.*;
 
 @XmlRootElement
 public class Taxi {
 
     private final int id;
+
+    private final String serverAddress;
 
     private final int port;
 
@@ -50,6 +51,8 @@ public class Taxi {
 
     private String topic;
 
+    private final TaxiBuffer buffer;
+
     private int requestIdTaken;
 
     private int rechargeStationId;
@@ -57,6 +60,10 @@ public class Taxi {
     private long rechargeRequestTimestamp;
 
     private int rides;
+
+    private double km;
+
+    private final Queue<Integer> requests;
 
     private final Object otherTaxisLock;
 
@@ -72,15 +79,21 @@ public class Taxi {
 
     private final Object chargingLock;
 
-    public Taxi(int id, int port) {
+    private final Object kmLock;
+
+    public Taxi(int id, int port, String serverAddress) {
         this.id = id;
         this.port = port;
+        this.serverAddress = serverAddress;
         this.ip = "localhost";
         this.battery = 100;
         this.restClient = Client.create();
         this.state = TaxiState.FREE;
         this.rechargeStationId = -1;
         this.rides = 0;
+        this.km = 0;
+        this.requests = new LinkedList<>();
+        this.buffer = new TaxiBuffer();
         this.batteryLock = new Object();
         this.otherTaxisLock = new Object();
         this.ridesLock = new Object();
@@ -88,6 +101,7 @@ public class Taxi {
         this.stateLock = new Object();
         this.startPosLock = new Object();
         this.chargingLock = new Object();
+        this.kmLock = new Object();
     }
 
     public TaxiState getState() {
@@ -156,6 +170,16 @@ public class Taxi {
         }
     }
 
+    public double getKm() {
+        synchronized (kmLock) {
+            return km;
+        }
+    }
+
+    public TaxiBuffer getBuffer() {
+        return buffer;
+    }
+
     public void setState(TaxiState value) {
         synchronized (stateLock) {
             this.state = value;
@@ -204,6 +228,18 @@ public class Taxi {
         this.rechargeRequestTimestamp = rechargeRequestTimestamp;
     }
 
+    public void addRequest(int requestId){
+        synchronized (requests) {
+            requests.offer(requestId);
+        }
+    }
+
+    public void removeRequest(int requestId) {
+        synchronized (requests) {
+            requests.remove(requestId);
+        }
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -223,9 +259,21 @@ public class Taxi {
         }
     }
 
+    private void incrementKm(double distance) {
+        synchronized (kmLock) {
+            km += distance;
+        }
+    }
+
     public void addTaxi(TaxiBean taxi) {
         synchronized (otherTaxisLock) {
             otherTaxis.add(taxi);
+        }
+    }
+
+    public void removeTaxi(TaxiBean taxi) {
+        synchronized (otherTaxisLock) {
+            otherTaxis.remove(taxi);
         }
     }
 
@@ -238,12 +286,14 @@ public class Taxi {
             e.printStackTrace();
         }
 
+        incrementKm(distance);
         setStartPos(request.getEndPos());
         subMqttTopic();
         decreaseBattery((int) Math.round(distance));
         setRequestIdTaken(-1);
         incrementRides();
-        System.out.println("Request completed");
+        removeRequest(request.getId());
+        System.out.println("Request " + request.getId() + " completed");
 
         if (battery < 30) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
@@ -260,6 +310,7 @@ public class Taxi {
     public void recharge(Point stationPosition) {
         double distance = Utils.getDistance(startPos, stationPosition);
         decreaseBattery((int) Math.round(distance));
+        incrementKm(distance);
         setStartPos(stationPosition);
 
         System.out.println("Taxi " + id + " is charging on station " + rechargeStationId);
@@ -289,7 +340,8 @@ public class Taxi {
         System.out.println("Battery level: " + battery + "%");
     }
 
-    private void register(TaxiBean taxiBean, String serverAddress) {
+    private void register() {
+        TaxiBean taxiBean = new TaxiBean(id, port, ip);
         ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean);
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nRegistration successful");
@@ -305,7 +357,6 @@ public class Taxi {
 
     private void startAcquiringData() {
         System.out.println("Starting acquiring data from PM10 sensor");
-        TaxiBuffer buffer = new TaxiBuffer();
         PM10Simulator pm10Simulator = new PM10Simulator(buffer);
         pm10Simulator.start();
     }
@@ -315,6 +366,16 @@ public class Taxi {
         String input = new Gson().toJson(taxiBean);
         try {
             return webResource.type("application/json").post(ClientResponse.class, input);
+        } catch (ClientHandlerException e) {
+            System.out.println("Server non disponibile");
+            return null;
+        }
+    }
+
+    private ClientResponse deleteRequest(String url, int id) {
+        WebResource webResource = restClient.resource(url + id);
+        try {
+            return webResource.type("application/json").delete(ClientResponse.class);
         } catch (ClientHandlerException e) {
             System.out.println("Server non disponibile");
             return null;
@@ -359,9 +420,10 @@ public class Taxi {
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                if (getState() == TaxiState.FREE) {
-                    new HandleElection(taxi, rideRequest).start();
+                addRequest(rideRequest.getId());
 
+                if (getState() == TaxiState.FREE) {
+                    setState(TaxiState.HANDLING);
                     try {
                         mqttClient.publish("seta/smartcity/rides/handled", message);
                     } catch (MqttException e) {
@@ -372,6 +434,8 @@ public class Taxi {
                         System.out.println("excep " + e);
                         e.printStackTrace();
                     }
+
+                    new HandleElection(taxi, rideRequest).start();
                 } else {
                     System.out.println("Taxi " + id + " is already driving or charging or in " +
                             "mutual exclusion for charging");
@@ -450,8 +514,8 @@ public class Taxi {
         }
     }
 
-    private void sendToOtherTaxis() {
-        for (TaxiBean t: otherTaxis) {
+    private void notifyOtherTaxisForJoining() {
+        for (TaxiBean t: getOtherTaxis()) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
             System.out.println("Taxi " + id + " connected to address " + t.getIp() + ":" + t.getPort());
@@ -480,6 +544,48 @@ public class Taxi {
                     channel.shutdownNow();
                 }
             });
+        }
+    }
+
+    private void notifyOtherTaxisForLeaving() {
+        for (TaxiBean t: getOtherTaxis()) {
+            final ManagedChannel channel =
+                    ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
+            System.out.println("Taxi " + id + " connected to address " + t.getIp() + ":" + t.getPort());
+            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
+            seta.proto.taxi.Taxi.TaxiMessage message =
+                    seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
+            stub.removeTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.RemoveTaxiResponseMessage>() {
+                @Override
+                public void onNext(seta.proto.taxi.Taxi.RemoveTaxiResponseMessage value) {
+                    if (value.getRemoved()) {
+                        System.out.println("Taxi " + t.getId() + " correctly updated");
+                    } else {
+                        System.out.println("Taxi " + t.getId() + " have been not correctly " +
+                                "updated");
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    t.printStackTrace();
+                    System.out.println(0);
+                }
+
+                @Override
+                public void onCompleted() {
+                    channel.shutdownNow();
+                }
+            });
+        }
+    }
+
+    private void leave() {
+        ClientResponse response = deleteRequest(serverAddress + "/taxis", id);
+        if (response != null && response.getStatus() == 200) {
+            System.out.println("\nRemoval successful");
+        } else {
+            System.exit(0);
         }
     }
 
@@ -516,15 +622,15 @@ public class Taxi {
             System.exit(0);
         }
 
-        Taxi taxi = new Taxi(id, port);
-        taxi.register(new TaxiBean(id, port, taxi.getIp()), serverAddress);
+        Taxi taxi = new Taxi(id, port, serverAddress);
+        taxi.register();
 
 //        startAcquiringData();
 
         new TaxiGrpcServer(taxi).start();
 
         if (!taxi.getOtherTaxis().isEmpty()) {
-            taxi.sendToOtherTaxis();
+            taxi.notifyOtherTaxisForJoining();
         }
 
         taxi.startMqttConnection(taxi);
@@ -564,6 +670,28 @@ public class Taxi {
             }
         } while (!action.equals("leave"));
 
-        //TODO: handle leave
+        taxi.setState(TaxiState.LEAVING);
+
+        synchronized (taxi.getStateLock()) {
+            if (taxi.getState() == TaxiState.FREE) {
+                taxi.mqttDisconnect();
+                taxi.notifyOtherTaxisForLeaving();
+                taxi.leave();
+            } else {
+                while (taxi.getState() != TaxiState.FREE) {
+                    try {
+                        taxi.getStateLock().wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
+                    if (taxi.getState() == TaxiState.FREE) {
+                        taxi.mqttDisconnect();
+                        taxi.notifyOtherTaxisForLeaving();
+                        taxi.leave();
+                    }
+                }
+            }
+        }
     }
 }

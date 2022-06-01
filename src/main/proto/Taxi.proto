@@ -41,8 +41,13 @@ message ElectionResponseMessage {
   required bool ok = 1;
 }
 
+message RemoveTaxiResponseMessage {
+  required bool removed = 1;
+}
+
 service TaxiService {
   rpc AddTaxi(TaxiMessage) returns (AddTaxiResponseMessage);
+  rpc RemoveTaxi(TaxiMessage) returns (RemoveTaxiResponseMessage);
   rpc SendElection(ElectionRequestMessage) returns (ElectionResponseMessage);
   rpc SendChargingRequest(ChargingRequestMessage) returns (ChargingResponseMessage);
 }

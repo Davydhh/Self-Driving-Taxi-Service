@@ -105,14 +105,6 @@ public class TaxisStatistics {
 
         return averageBatteryOpt.isPresent() ? averageBatteryOpt.getAsDouble() : 0;
     }
-
-    private double getAverage(List<?> taxisStatistics,
-                              ToDoubleFunction mapToDoubleFunction) {
-        OptionalDouble averageBatteryOpt =
-                taxisStatistics.stream().mapToDouble(mapToDoubleFunction).average();
-
-        return averageBatteryOpt.isPresent() ? averageBatteryOpt.getAsDouble() : 0;
-    }
     public String getAllStatisticsBetweenTimestamps(long t1, long t2) {
         List<AverageStatistics> averageStatistics = new ArrayList<>();
 
