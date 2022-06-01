@@ -63,7 +63,7 @@ public class Taxi {
 
     private double km;
 
-    private final Queue<Integer> requests;
+    private final Queue<RideRequest> requests;
 
     private final Object otherTaxisLock;
 
@@ -183,7 +183,7 @@ public class Taxi {
     public void setState(TaxiState value) {
         synchronized (stateLock) {
             this.state = value;
-            System.out.println("Taxi " + id + " changed state to " + value);
+            System.out.println("\nTaxi " + id + " changed state to " + value);
         }
 
         if (value == TaxiState.FREE) {
@@ -228,15 +228,23 @@ public class Taxi {
         this.rechargeRequestTimestamp = rechargeRequestTimestamp;
     }
 
-    public void addRequest(int requestId){
+    public void addRequest(RideRequest request){
         synchronized (requests) {
-            requests.offer(requestId);
+            requests.offer(request);
         }
     }
 
-    public void removeRequest(int requestId) {
+    public void removeRequest(RideRequest request) {
         synchronized (requests) {
-            requests.remove(requestId);
+            System.out.println("Remove request " + request.getId());
+            requests.remove(request);
+            System.out.println("Queue: " + requests);
+        }
+    }
+
+    public boolean hasAlreadyInQueue(RideRequest request) {
+        synchronized (requests) {
+            return requests.contains(request);
         }
     }
 
@@ -292,13 +300,32 @@ public class Taxi {
         decreaseBattery((int) Math.round(distance));
         setRequestIdTaken(-1);
         incrementRides();
-        removeRequest(request.getId());
         System.out.println("Request " + request.getId() + " completed");
 
         if (battery < 30) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
             setState(TaxiState.LOW);
             new HandleCharging(this).start();
+        } else if (!requests.isEmpty()) {
+            setState(TaxiState.HANDLING);
+            RideRequest pendingRequest = requests.poll();
+
+            if (pendingRequest != null && getTopic().equals(Utils.getDistrictTopicFromPosition(pendingRequest.getStartPos()))) {
+                System.out.println("Getting request " + pendingRequest.getId() + " from queue");
+                try {
+                    String payload = new Gson().toJson(pendingRequest);
+                    mqttClient.publish("seta/smartcity/rides/handled", new MqttMessage(payload.getBytes()));
+                } catch (MqttException e) {
+                    System.out.println("reason " + e.getReasonCode());
+                    System.out.println("msg " + e.getMessage());
+                    System.out.println("loc " + e.getLocalizedMessage());
+                    System.out.println("cause " + e.getCause());
+                    System.out.println("excep " + e);
+                    e.printStackTrace();
+                }
+
+                new HandleElection(this, pendingRequest).start();
+            }
         } else {
             setState(TaxiState.FREE);
             synchronized (getStateLock()) {
@@ -413,6 +440,7 @@ public class Taxi {
 
             public void messageArrived(String topic, MqttMessage message) {
                 String receivedMessage = new String(message.getPayload());
+                System.out.println("--------------------------------");
                 System.out.println("Taxi " + id + " received a Message!" +
                         "\n\tTopic:   " + topic +
                         "\n\tMessage: " + receivedMessage +
@@ -420,10 +448,11 @@ public class Taxi {
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                addRequest(rideRequest.getId());
+                addRequest(rideRequest);
 
                 if (getState() == TaxiState.FREE) {
                     setState(TaxiState.HANDLING);
+
                     try {
                         mqttClient.publish("seta/smartcity/rides/handled", message);
                     } catch (MqttException e) {
@@ -438,7 +467,7 @@ public class Taxi {
                     new HandleElection(taxi, rideRequest).start();
                 } else {
                     System.out.println("Taxi " + id + " is already driving or charging or in " +
-                            "mutual exclusion for charging");
+                            "mutual exclusion for charging or has already the request in queue");
                 }
             }
 

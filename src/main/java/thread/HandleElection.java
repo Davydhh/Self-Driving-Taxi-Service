@@ -56,12 +56,13 @@ public class HandleElection extends Thread {
         List<TaxiBean> taxiList = taxi.getOtherTaxis();
 
         if (taxiList.isEmpty()) {
-            System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
+            System.out.println("\nTaxi " + taxi.getId() + " takes charge of the ride " + request.getId());
+            taxi.removeRequest(request);
             taxi.setState(TaxiState.BUSY);
             taxi.setRequestIdTaken(request.getId());
             taxi.drive(request);
         } else {
-            synchronized (taxi.getOtherTaxisLock()) {
+            synchronized (counterLock) {
                 for (TaxiBean t : taxiList) {
                     final ManagedChannel channel =
                             ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
@@ -109,20 +110,19 @@ public class HandleElection extends Thread {
     }
 
     private void waitUntilReceiveAllOk() {
-        System.out.println("Taxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
+        System.out.println("\nTaxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
+        taxi.removeRequest(request);
 
-        synchronized (counterLock) {
-            while (taxi.getState() != TaxiState.BUSY) {
-                try {
-                    counterLock.wait();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+        while (taxi.getState() != TaxiState.BUSY) {
+            try {
+                counterLock.wait();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
 
-                if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == request.getId()) {
-                    System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
-                    taxi.drive(request);
-                }
+            if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == request.getId()) {
+                System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
+                taxi.drive(request);
             }
         }
     }

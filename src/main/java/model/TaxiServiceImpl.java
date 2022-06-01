@@ -1,6 +1,7 @@
 package model;
 
 import io.grpc.stub.StreamObserver;
+import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi;
 import seta.proto.taxi.TaxiServiceGrpc.TaxiServiceImplBase;
@@ -56,25 +57,33 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
-            taxi.removeRequest(rideRequest.getId());
+            taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                    new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
         } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() != rideRequest.getId()) {
             System.out.println("Taxi " + taxi.getId() + " is already driving but for request " + taxi.getRequestIdTaken());
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
-            taxi.removeRequest(rideRequest.getId());
+            taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                    new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
         } else if (taxi.getState() == TaxiState.CHARGING) {
             System.out.println("Taxi " + taxi.getId() + " is charging");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
-            taxi.removeRequest(rideRequest.getId());
+            taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                    new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
         } else if (taxi.getState() == TaxiState.LOW) {
             System.out.println("Taxi " + taxi.getId() + " is low");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
-            taxi.removeRequest(rideRequest.getId());
+            taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                    new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
         } else if (taxi.getState() == TaxiState.LEAVING) {
             System.out.println("Taxi " + taxi.getId() + " is leaving");
 
@@ -84,7 +93,9 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(false).build();
 
-            taxi.removeRequest(rideRequest.getId());
+            taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                    new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
         } else {
             double currentDistance = Utils.getDistance(new Point((int) rideRequest.getStartX(),
                     (int) rideRequest.getStartY()), taxi.getStartPos());
@@ -103,7 +114,9 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
                 response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
-                taxi.removeRequest(rideRequest.getId());
+                taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                        new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                        new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
             } else {
                 System.out.println("Taxi " + taxi.getId() + " and Taxi " + electionRequest.getTaxiId()
                         + " have the same distance: " + currentDistance + " = " + requestDistance
@@ -125,7 +138,9 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
                     response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
-                    taxi.removeRequest(rideRequest.getId());
+                    taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                            new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                            new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
                 } else {
                     System.out.println("Taxi " + taxi.getId() + " and Taxi " + electionRequest.getTaxiId()
                             + " have the same battery: " + currentTaxiBattery + " = " + requestTaxiBattery
@@ -145,7 +160,9 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
                         response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
-                        taxi.removeRequest(rideRequest.getId());
+                        taxi.removeRequest(new RideRequest(rideRequest.getId(),
+                                new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
+                                new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
                     }
                 }
             }
