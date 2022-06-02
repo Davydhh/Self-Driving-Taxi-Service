@@ -4,7 +4,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import model.ChargingStation;
-import model.ChargingStations;
 import model.Taxi;
 import model.TaxiState;
 import rest.beans.TaxiBean;
@@ -12,7 +11,6 @@ import seta.proto.taxi.Taxi.ChargingRequestMessage;
 import seta.proto.taxi.TaxiServiceGrpc;
 import util.Utils;
 
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 

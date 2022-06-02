@@ -11,9 +11,11 @@ import io.grpc.stub.StreamObserver;
 import org.eclipse.paho.client.mqttv3.*;
 import rest.beans.RegistrationResponse;
 import rest.beans.RideRequest;
+import rest.beans.Statistics;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.TaxiServiceGrpc;
 import simulator.PM10Simulator;
+import thread.ComputeTaxiStatistics;
 import thread.HandleCharging;
 import thread.HandleElection;
 import thread.TaxiGrpcServer;
@@ -296,7 +298,7 @@ public class Taxi {
         incrementKm(distance);
         setStartPos(request.getEndPos());
         subMqttTopic();
-        decreaseBattery((int) Math.round(distance));
+        dischargeBattery((int) Math.round(distance));
         setRequestId(-1);
         removeRequest(request);
         incrementRides();
@@ -336,7 +338,7 @@ public class Taxi {
 
     public void recharge(Point stationPosition) {
         double distance = Utils.getDistance(startPos, stationPosition);
-        decreaseBattery((int) Math.round(distance));
+        dischargeBattery((int) Math.round(distance));
         incrementKm(distance);
         setStartPos(stationPosition);
 
@@ -360,7 +362,7 @@ public class Taxi {
         }
     }
 
-    private void decreaseBattery(int value) {
+    private void dischargeBattery(int value) {
         synchronized (batteryLock) {
             battery -= value;
         }
@@ -369,7 +371,7 @@ public class Taxi {
 
     private void register() {
         TaxiBean taxiBean = new TaxiBean(id, port, ip);
-        ClientResponse response = postRequest(serverAddress + "/taxis", taxiBean);
+        ClientResponse response = sendAddTaxiPost(serverAddress + "/taxis", taxiBean);
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nRegistration successful");
             RegistrationResponse responseBody = new Gson().fromJson(response.getEntity(String.class),
@@ -386,9 +388,10 @@ public class Taxi {
         System.out.println("Starting acquiring data from PM10 sensor");
         PM10Simulator pm10Simulator = new PM10Simulator(buffer);
         pm10Simulator.start();
+        new ComputeTaxiStatistics(this).start();
     }
 
-    private ClientResponse postRequest(String url, TaxiBean taxiBean) {
+    private ClientResponse sendAddTaxiPost(String url, TaxiBean taxiBean) {
         WebResource webResource = restClient.resource(url);
         String input = new Gson().toJson(taxiBean);
         try {
@@ -529,6 +532,7 @@ public class Taxi {
 
     public void mqttDisconnect() {
         try {
+            System.out.println("\nMqtt disconnect");
             mqttClient.disconnect();
         } catch (MqttException ex) {
             ex.printStackTrace();
@@ -598,14 +602,35 @@ public class Taxi {
     private void leave() {
         setState(TaxiState.LEAVING);
         mqttDisconnect();
+        notifyOtherTaxisForLeaving();
 
         ClientResponse response = deleteRequest(serverAddress + "/taxis", id);
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nRemoval successful");
-            notifyOtherTaxisForLeaving();
             System.exit(0);
         } else {
             System.out.println("\nRemoval unsuccessful");
+        }
+    }
+
+    private ClientResponse sendStatisticsPost(String url, Statistics statistics) {
+        WebResource webResource = restClient.resource(url);
+        String input = new Gson().toJson(statistics);
+        try {
+            return webResource.type("application/json").post(ClientResponse.class, input);
+        } catch (ClientHandlerException e) {
+            System.out.println("Server non disponibile");
+            return null;
+        }
+    }
+
+    public void sendStatistics(Statistics statistics) {
+        ClientResponse response = sendStatisticsPost(serverAddress + "/statistics/" + id, statistics);
+        if (response != null && response.getStatus() == 200) {
+            System.out.println("\nStatistics sent successfully");
+        } else {
+            System.out.println("\nStatistics sent unsuccessfully");
+            System.exit(0);
         }
     }
 
@@ -645,7 +670,7 @@ public class Taxi {
         Taxi taxi = new Taxi(id, port, serverAddress);
         taxi.register();
 
-//        startAcquiringData();
+        taxi.startAcquiringData();
 
         new TaxiGrpcServer(taxi).start();
 
@@ -680,7 +705,7 @@ public class Taxi {
                     }
                 }
             }
-        } while (!action.equals("leave"));
+        } while (!action.equals("quit"));
 
         synchronized (taxi.getStateLock()) {
             if (taxi.getState() == TaxiState.FREE) {

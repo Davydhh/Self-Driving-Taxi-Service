@@ -16,14 +16,18 @@ public class ComputeTaxiStatistics extends Thread {
 
     @Override
     public void run() {
-        Statistics statistics = new Statistics(taxi.getKm(), taxi.getRides(),
-                taxi.getBuffer().readAllAndClean().stream().map(Measurement::getValue).collect(Collectors.toList()),
-                Utils.getCurrentTimestamp(), taxi.getBattery());
+        while(true) {
+            try {
+                Thread.sleep(15000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
 
-        try {
-            Thread.sleep(15000);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
+            Statistics statistics = new Statistics(taxi.getKm(), taxi.getRides(),
+                    taxi.getBuffer().readAllAndClean().stream().map(Measurement::getValue).collect(Collectors.toList()),
+                    Utils.getCurrentTimestamp(), taxi.getBattery());
+
+            taxi.sendStatistics(statistics);
         }
     }
 }
