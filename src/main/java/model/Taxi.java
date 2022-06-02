@@ -53,7 +53,7 @@ public class Taxi {
 
     private final TaxiBuffer buffer;
 
-    private int requestIdTaken;
+    private int requestId;
 
     private int rechargeStationId;
 
@@ -134,8 +134,8 @@ public class Taxi {
         }
     }
 
-    public int getRequestIdTaken() {
-        return requestIdTaken;
+    public int getRequestId() {
+        return requestId;
     }
 
     public int getRechargeStationId() {
@@ -215,9 +215,9 @@ public class Taxi {
         }
     }
 
-    public void setRequestIdTaken(int requestIdTaken) {
-        this.requestIdTaken = requestIdTaken;
-        System.out.println("Set Taxi " + id + " request " + requestIdTaken);
+    public void setRequestId(int requestId) {
+        this.requestId = requestId;
+        System.out.println("Set Taxi " + id + " request " + requestId);
     }
 
     public void setRechargeStationId(int rechargeStationId) {
@@ -236,7 +236,6 @@ public class Taxi {
 
     public void removeRequest(RideRequest request) {
         synchronized (requests) {
-            System.out.println("Remove request " + request.getId());
             requests.remove(request);
             System.out.println("Queue: " + requests);
         }
@@ -298,7 +297,8 @@ public class Taxi {
         setStartPos(request.getEndPos());
         subMqttTopic();
         decreaseBattery((int) Math.round(distance));
-        setRequestIdTaken(-1);
+        setRequestId(-1);
+        removeRequest(request);
         incrementRides();
         System.out.println("Request " + request.getId() + " completed");
 
@@ -613,6 +613,7 @@ public class Taxi {
         ClientResponse response = deleteRequest(serverAddress + "/taxis", id);
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nRemoval successful");
+            System.exit(0);
         } else {
             System.exit(0);
         }
@@ -673,11 +674,7 @@ public class Taxi {
             if (action.equals("recharge")) {
                 synchronized (taxi.getStateLock()) {
                     if (taxi.getState() == TaxiState.FREE) {
-                        if (taxi.getBattery() < 100) {
-                            new HandleCharging(taxi).start();
-                        } else {
-                            System.out.println("Battery already full!");
-                        }
+                        new HandleCharging(taxi).start();
                     } else {
                         while (taxi.getState() != TaxiState.FREE) {
                             try {
@@ -687,11 +684,7 @@ public class Taxi {
                             }
 
                             if (taxi.getState() == TaxiState.FREE) {
-                                if (taxi.getBattery() < 100) {
-                                    new HandleCharging(taxi).start();
-                                } else {
-                                    System.out.println("Battery already full!");
-                                }
+                                new HandleCharging(taxi).start();
                             }
                         }
                     }

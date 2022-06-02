@@ -60,8 +60,8 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
             taxi.removeRequest(new RideRequest(rideRequest.getId(),
                     new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
                     new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
-        } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() != rideRequest.getId()) {
-            System.out.println("Taxi " + taxi.getId() + " is already driving but for request " + taxi.getRequestIdTaken());
+        } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestId() != rideRequest.getId()) {
+            System.out.println("Taxi " + taxi.getId() + " is already driving but for request " + taxi.getRequestId());
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
 
@@ -88,8 +88,8 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
             System.out.println("Taxi " + taxi.getId() + " is leaving");
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
-        } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == rideRequest.getId()) {
-            System.out.println("Taxi " + taxi.getId() + " is already driving for request " + taxi.getRequestIdTaken());
+        } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestId() == rideRequest.getId()) {
+            System.out.println("Taxi " + taxi.getId() + " is already driving for request " + taxi.getRequestId());
 
             response = Taxi.ElectionResponseMessage.newBuilder().setOk(false).build();
 

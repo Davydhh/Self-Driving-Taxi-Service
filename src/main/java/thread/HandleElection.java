@@ -36,6 +36,8 @@ public class HandleElection extends Thread {
     public void run() {
         System.out.println("Starting election for request " + request.getId());
 
+        taxi.setRequestId(request.getId());
+
         double distance = getDistance(request.getStartPos(), taxi.getStartPos());
 
         RideRequestMessage rideRequest = RideRequestMessage.newBuilder()
@@ -57,9 +59,7 @@ public class HandleElection extends Thread {
 
         if (taxiList.isEmpty()) {
             System.out.println("\nTaxi " + taxi.getId() + " takes charge of the ride " + request.getId());
-            taxi.removeRequest(request);
             taxi.setState(TaxiState.BUSY);
-            taxi.setRequestIdTaken(request.getId());
             taxi.drive(request);
         } else {
             synchronized (counterLock) {
@@ -75,6 +75,9 @@ public class HandleElection extends Thread {
                             if (!value.getOk()) {
                                 System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
                                         "Taxi " + t.getId() + " about request " + request.getId());
+                                taxi.removeRequest(request);
+                                taxi.setState(TaxiState.FREE);
+                                taxi.setRequestId(-1);
                             } else {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
                                         + " about request " + request.getId());
@@ -84,7 +87,6 @@ public class HandleElection extends Thread {
 
                                     if (okCounter == taxiList.size()) {
                                         taxi.setState(TaxiState.BUSY);
-                                        taxi.setRequestIdTaken(request.getId());
                                         counterLock.notifyAll();
                                     }
                                 }
@@ -103,15 +105,14 @@ public class HandleElection extends Thread {
                         }
                     });
                 }
-            }
 
-            waitUntilReceiveAllOk();
+                waitUntilReceiveAllOk();
+            }
         }
     }
 
     private void waitUntilReceiveAllOk() {
         System.out.println("\nTaxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
-        taxi.removeRequest(request);
 
         while (taxi.getState() != TaxiState.BUSY) {
             try {
@@ -120,7 +121,7 @@ public class HandleElection extends Thread {
                 e.printStackTrace();
             }
 
-            if (taxi.getState() == TaxiState.BUSY && taxi.getRequestIdTaken() == request.getId()) {
+            if (taxi.getState() == TaxiState.BUSY && taxi.getRequestId() == request.getId()) {
                 System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
                 taxi.drive(request);
             }
