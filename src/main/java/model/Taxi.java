@@ -400,7 +400,7 @@ public class Taxi {
     }
 
     private ClientResponse deleteRequest(String url, int id) {
-        WebResource webResource = restClient.resource(url + id);
+        WebResource webResource = restClient.resource(url + "/" + id);
         try {
             return webResource.type("application/json").delete(ClientResponse.class);
         } catch (ClientHandlerException e) {
@@ -581,41 +581,31 @@ public class Taxi {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
             System.out.println("Taxi " + id + " connected to address " + t.getIp() + ":" + t.getPort());
-            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
+            TaxiServiceGrpc.TaxiServiceBlockingStub stub = TaxiServiceGrpc.newBlockingStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
                     seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
-            stub.removeTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.RemoveTaxiResponseMessage>() {
-                @Override
-                public void onNext(seta.proto.taxi.Taxi.RemoveTaxiResponseMessage value) {
-                    if (value.getRemoved()) {
-                        System.out.println("Taxi " + t.getId() + " correctly updated");
-                    } else {
-                        System.out.println("Taxi " + t.getId() + " have been not correctly " +
-                                "updated");
-                    }
-                }
+            seta.proto.taxi.Taxi.RemoveTaxiResponseMessage response = stub.removeTaxi(message);
 
-                @Override
-                public void onError(Throwable t) {
-                    t.printStackTrace();
-                    System.out.println(0);
-                }
-
-                @Override
-                public void onCompleted() {
-                    channel.shutdownNow();
-                }
-            });
+            if (response.getRemoved()) {
+                System.out.println("Taxi " + t.getId() + " correctly updated");
+            } else {
+                System.out.println("Taxi " + t.getId() + " have been not correctly " +
+                        "updated");
+            }
         }
     }
 
     private void leave() {
+        setState(TaxiState.LEAVING);
+        mqttDisconnect();
+
         ClientResponse response = deleteRequest(serverAddress + "/taxis", id);
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nRemoval successful");
+            notifyOtherTaxisForLeaving();
             System.exit(0);
         } else {
-            System.exit(0);
+            System.out.println("\nRemoval unsuccessful");
         }
     }
 
@@ -692,15 +682,12 @@ public class Taxi {
             }
         } while (!action.equals("leave"));
 
-        taxi.setState(TaxiState.LEAVING);
-
         synchronized (taxi.getStateLock()) {
             if (taxi.getState() == TaxiState.FREE) {
-                taxi.mqttDisconnect();
-                taxi.notifyOtherTaxisForLeaving();
                 taxi.leave();
             } else {
                 while (taxi.getState() != TaxiState.FREE) {
+                    System.out.println("Wait until all operations finish");
                     try {
                         taxi.getStateLock().wait();
                     } catch (InterruptedException e) {
@@ -708,8 +695,6 @@ public class Taxi {
                     }
 
                     if (taxi.getState() == TaxiState.FREE) {
-                        taxi.mqttDisconnect();
-                        taxi.notifyOtherTaxisForLeaving();
                         taxi.leave();
                     }
                 }
