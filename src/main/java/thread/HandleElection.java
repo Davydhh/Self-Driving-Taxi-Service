@@ -12,6 +12,7 @@ import seta.proto.taxi.Taxi.ElectionResponseMessage;
 import seta.proto.taxi.Taxi.RideRequestMessage;
 import seta.proto.taxi.TaxiServiceGrpc;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static util.Utils.getDistance;
@@ -55,7 +56,7 @@ public class HandleElection extends Thread {
                 .setRideRequest(rideRequest)
                 .build();
 
-        List<TaxiBean> taxiList = taxi.getOtherTaxis();
+        List<TaxiBean> taxiList = new ArrayList<>(taxi.getOtherTaxis());
 
         if (taxiList.isEmpty()) {
             System.out.println("\nTaxi " + taxi.getId() + " takes charge of the ride " + request.getId());

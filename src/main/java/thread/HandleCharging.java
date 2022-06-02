@@ -13,6 +13,7 @@ import seta.proto.taxi.TaxiServiceGrpc;
 import util.Utils;
 
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 
 public class HandleCharging extends Thread {
@@ -41,7 +42,7 @@ public class HandleCharging extends Thread {
         taxi.setRechargeStationId(station.getId());
         taxi.setRechargeRequestTimestamp(Utils.getCurrentTimestamp());
 
-        List<TaxiBean> taxiList = taxi.getOtherTaxis();
+        List<TaxiBean> taxiList = new ArrayList<>(taxi.getOtherTaxis());
 
         synchronized (counterLock) {
             if (taxiList.isEmpty()) {
