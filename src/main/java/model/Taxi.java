@@ -199,6 +199,7 @@ public class Taxi {
 
         if (value == TaxiState.FREE) {
             MqttMessage message = new MqttMessage(getTopic().getBytes());
+            message.setQos(2);
             try {
                 mqttClient.publish("seta/smartcity/taxis/free", message);
             } catch (MqttException e) {
@@ -326,7 +327,9 @@ public class Taxi {
                 System.out.println("Getting request " + pendingRequest.getId() + " from queue");
                 try {
                     String payload = new Gson().toJson(pendingRequest);
-                    mqttClient.publish("seta/smartcity/rides/handled", new MqttMessage(payload.getBytes()));
+                    MqttMessage message = new MqttMessage(payload.getBytes());
+                    message.setQos(2);
+                    mqttClient.publish("seta/smartcity/rides/handled", message);
                 } catch (MqttException e) {
                     System.out.println("reason " + e.getReasonCode());
                     System.out.println("msg " + e.getMessage());
