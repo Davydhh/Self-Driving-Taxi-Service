@@ -73,6 +73,8 @@ public class Taxi {
 
     private PM10Simulator pm10Simulator;
 
+    private TaxiGrpcServer rpcThread;
+
     private final Queue<RideRequest> requests;
 
     private final Object otherTaxisLock;
@@ -131,10 +133,6 @@ public class Taxi {
         return port;
     }
 
-    public String getIp() {
-        return ip;
-    }
-
     public int getBattery() {
         synchronized (batteryLock) {
             return battery;
@@ -167,10 +165,6 @@ public class Taxi {
 
     public Object getStateLock() {
         return stateLock;
-    }
-
-    public Object getOtherTaxisLock() {
-        return otherTaxisLock;
     }
 
     public Object getChargingLock() {
@@ -628,6 +622,11 @@ public class Taxi {
         mqttDisconnect();
         notifyOtherTaxisForLeaving();
 
+        synchronized (chargingLock) {
+            chargingLock.notifyAll();
+        }
+
+        rpcThread.stopMeGently();
         pm10Simulator.stopMeGently();
         statisticsThread.stopMeGently();
 
@@ -636,16 +635,12 @@ public class Taxi {
         }
 
         try {
-            if (electionThread != null) {
-                electionThread.join();
-            }
-
-            if (chargingThread != null) {
-                chargingThread.join();
-            }
-
             pm10Simulator.join();
+            System.out.println("Simulator finished");
             statisticsThread.join();
+            System.out.println("Computing statistics finished");
+            rpcThread.join();
+            System.out.println("Rpc server finished");
         } catch (InterruptedException e) {
             e.printStackTrace();
             throw new RuntimeException(e);
@@ -676,7 +671,6 @@ public class Taxi {
             System.out.println("\nStatistics sent successfully");
         } else {
             System.out.println("\nStatistics sent unsuccessfully");
-            System.exit(0);
         }
     }
 
@@ -718,7 +712,8 @@ public class Taxi {
 
         taxi.startAcquiringData();
 
-        new TaxiGrpcServer(taxi).start();
+        taxi.rpcThread = new TaxiGrpcServer(taxi);
+        taxi.rpcThread.start();
 
         if (!taxi.getOtherTaxis().isEmpty()) {
             taxi.notifyOtherTaxisForJoining();
@@ -759,7 +754,7 @@ public class Taxi {
             if (taxi.getState() == TaxiState.FREE) {
                 taxi.leave();
             } else {
-                while (taxi.getState() != TaxiState.FREE) {
+                while (taxi.getState() != TaxiState.FREE && taxi.getState() != TaxiState.LEAVING) {
                     System.out.println("Wait until all operations finish");
                     try {
                         taxi.getStateLock().wait();

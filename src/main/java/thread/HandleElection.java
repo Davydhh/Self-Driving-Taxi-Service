@@ -96,8 +96,17 @@ public class HandleElection extends Thread {
 
                         @Override
                         public void onError(Throwable t) {
-                            t.printStackTrace();
-                            System.exit(0);
+                            System.out.println("Taxi " + taxi.getId() + " received ok from a Taxi" +
+                                    " that has leaved about request " + request.getId());
+
+                            synchronized (counterLock) {
+                                okCounter += 1;
+
+                                if (okCounter == taxiList.size()) {
+                                    taxi.setState(TaxiState.BUSY);
+                                    counterLock.notifyAll();
+                                }
+                            }
                         }
 
                         @Override

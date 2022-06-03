@@ -11,6 +11,8 @@ import java.util.concurrent.TimeUnit;
 public class TaxiGrpcServer extends Thread {
     private final Taxi taxi;
 
+    private Server server;
+
     public TaxiGrpcServer(Taxi taxi) {
         this.taxi = taxi;
     }
@@ -21,7 +23,7 @@ public class TaxiGrpcServer extends Thread {
     }
 
     private void startGrpcServer() {
-        Server server =
+        server =
                 ServerBuilder.forPort(taxi.getPort()).addService(new TaxiServiceImpl(taxi)).build();
 
         try {
@@ -32,5 +34,9 @@ public class TaxiGrpcServer extends Thread {
         } catch (IOException | InterruptedException ex) {
             ex.printStackTrace();
             System.exit(0);}
+    }
+
+    public void stopMeGently() {
+        server.shutdownNow();
     }
 }
