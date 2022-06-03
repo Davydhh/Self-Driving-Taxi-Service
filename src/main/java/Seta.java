@@ -4,10 +4,7 @@ import rest.beans.RideRequest;
 import thread.RideRequestGenerator;
 import util.Utils;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Seta {
     public static void main(String[] args) {
@@ -25,7 +22,7 @@ public class Seta {
             client.connect(connOpts);
             System.out.println(clientId + " Connected");
 
-            Map<String, List<RideRequest>> requests = new HashMap<>();
+            Map<String, Queue<RideRequest>> requests = new HashMap<>();
 
             client.setCallback(new MqttCallback() {
                 @Override
@@ -44,7 +41,13 @@ public class Seta {
 
                     if (topic.equals("seta/smartcity/taxis/free")) {
                         System.out.println("Taxis available on topic " + receivedMessage);
-                        for (RideRequest r: requests.get(receivedMessage)) {
+                        RideRequest r;
+
+                        synchronized (requests) {
+                            r = requests.get(receivedMessage).poll();
+                        }
+
+                        if (r != null) {
                             String payload = new Gson().toJson(r);
                             MqttMessage pubMessage = new MqttMessage(payload.getBytes());
                             try {
@@ -63,7 +66,7 @@ public class Seta {
                         RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
                         String requestTopic =
                                 Utils.getDistrictTopicFromPosition(rideRequest.getStartPos());
-                        List<RideRequest> requestsByTopic = requests.get(requestTopic);
+                        Queue<RideRequest> requestsByTopic = requests.get(requestTopic);
 
                         if (requestsByTopic != null && !requestsByTopic.isEmpty()) {
                             requestsByTopic.remove(rideRequest);

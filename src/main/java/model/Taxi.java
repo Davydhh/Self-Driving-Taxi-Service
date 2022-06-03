@@ -65,6 +65,14 @@ public class Taxi {
 
     private double km;
 
+    private ComputeTaxiStatistics statisticsThread;
+
+    private HandleCharging chargingThread;
+
+    private HandleElection electionThread;
+
+    private PM10Simulator pm10Simulator;
+
     private final Queue<RideRequest> requests;
 
     private final Object otherTaxisLock;
@@ -82,6 +90,8 @@ public class Taxi {
     private final Object chargingLock;
 
     private final Object kmLock;
+
+    private final Object statisticsLock;
 
     public Taxi(int id, int port, String serverAddress) {
         this.id = id;
@@ -104,6 +114,7 @@ public class Taxi {
         this.startPosLock = new Object();
         this.chargingLock = new Object();
         this.kmLock = new Object();
+        this.statisticsLock = new Object();
     }
 
     public TaxiState getState() {
@@ -182,6 +193,10 @@ public class Taxi {
         return buffer;
     }
 
+    public Object getStatisticsLock() {
+        return statisticsLock;
+    }
+
     public void setState(TaxiState value) {
         synchronized (stateLock) {
             this.state = value;
@@ -232,7 +247,9 @@ public class Taxi {
 
     public void addRequest(RideRequest request){
         synchronized (requests) {
-            requests.offer(request);
+            if (!requests.contains(request)) {
+                requests.offer(request);
+            }
         }
     }
 
@@ -301,7 +318,8 @@ public class Taxi {
         if (battery < 30) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
             setState(TaxiState.LOW);
-            new HandleCharging(this).start();
+            chargingThread = new HandleCharging(this);
+            chargingThread.start();
         } else if (!requests.isEmpty()) {
             setState(TaxiState.HANDLING);
             RideRequest pendingRequest;
@@ -324,7 +342,8 @@ public class Taxi {
                     e.printStackTrace();
                 }
 
-                new HandleElection(this, pendingRequest).start();
+                electionThread = new HandleElection(this, pendingRequest);
+                electionThread.start();
             } else {
                 setState(TaxiState.FREE);
                 synchronized (getStateLock()) {
@@ -389,9 +408,10 @@ public class Taxi {
 
     private void startAcquiringData() {
         System.out.println("Starting acquiring data from PM10 sensor");
-        PM10Simulator pm10Simulator = new PM10Simulator(buffer);
+        pm10Simulator = new PM10Simulator(buffer);
         pm10Simulator.start();
-        new ComputeTaxiStatistics(this).start();
+        statisticsThread  = new ComputeTaxiStatistics(this);
+        statisticsThread.start();
     }
 
     private ClientResponse sendAddTaxiPost(String url, TaxiBean taxiBean) {
@@ -470,7 +490,8 @@ public class Taxi {
                         e.printStackTrace();
                     }
 
-                    new HandleElection(taxi, rideRequest).start();
+                    electionThread = new HandleElection(taxi, rideRequest);
+                    electionThread.start();
                 } else {
                     System.out.println("Taxi " + id + " is already driving or charging or in " +
                             "mutual exclusion for charging or has already the request in queue");
@@ -607,10 +628,32 @@ public class Taxi {
         mqttDisconnect();
         notifyOtherTaxisForLeaving();
 
+        pm10Simulator.stopMeGently();
+        statisticsThread.stopMeGently();
+
+        synchronized (statisticsLock) {
+            statisticsLock.notify();
+        }
+
+        try {
+            if (electionThread != null) {
+                electionThread.join();
+            }
+
+            if (chargingThread != null) {
+                chargingThread.join();
+            }
+
+            pm10Simulator.join();
+            statisticsThread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
+
         ClientResponse response = deleteRequest(serverAddress + "/taxis", id);
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nRemoval successful");
-            System.exit(0);
         } else {
             System.out.println("\nRemoval unsuccessful");
         }
@@ -673,7 +716,7 @@ public class Taxi {
         Taxi taxi = new Taxi(id, port, serverAddress);
         taxi.register();
 
-//        taxi.startAcquiringData();
+        taxi.startAcquiringData();
 
         new TaxiGrpcServer(taxi).start();
 
@@ -692,7 +735,8 @@ public class Taxi {
             if (action.equals("recharge")) {
                 synchronized (taxi.getStateLock()) {
                     if (taxi.getState() == TaxiState.FREE) {
-                        new HandleCharging(taxi).start();
+                        taxi.chargingThread = new HandleCharging(taxi);
+                        taxi.chargingThread.start();
                     } else {
                         while (taxi.getState() != TaxiState.FREE) {
                             try {
@@ -702,7 +746,8 @@ public class Taxi {
                             }
 
                             if (taxi.getState() == TaxiState.FREE) {
-                                new HandleCharging(taxi).start();
+                                taxi.chargingThread = new HandleCharging(taxi);
+                                taxi.chargingThread.start();
                             }
                         }
                     }

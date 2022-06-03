@@ -8,10 +8,7 @@ import rest.beans.RideRequest;
 import util.Utils;
 
 import java.awt.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 
 public class RideRequestGenerator extends Thread {
     private int requestId;
@@ -20,9 +17,9 @@ public class RideRequestGenerator extends Thread {
 
     private final MqttClient client;
 
-    private final Map<String, List<RideRequest>> requests;
+    private final Map<String, Queue<RideRequest>> requests;
 
-    public RideRequestGenerator(MqttClient client, Map<String, List<RideRequest>> requests) {
+    public RideRequestGenerator(MqttClient client, Map<String, Queue<RideRequest>> requests) {
         this.client = client;
         this.requestId = 0;
         this.random = new Random();
@@ -64,7 +61,7 @@ public class RideRequestGenerator extends Thread {
         System.out.println("Publishing message: " + payload);
 
         try {
-            requests.computeIfAbsent(pubTopic, r -> new ArrayList<>()).add(request);
+            requests.computeIfAbsent(pubTopic, r -> new LinkedList<>()).offer(request);
             client.publish(pubTopic, message);
             System.out.println("Seta requests: " + requests);
         } catch (MqttException e) {
