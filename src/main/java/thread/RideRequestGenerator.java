@@ -59,7 +59,7 @@ public class RideRequestGenerator extends Thread {
         String pubTopic = Utils.getDistrictTopicFromPosition(startPos);
         String payload = new Gson().toJson(request);
         MqttMessage message = new MqttMessage(payload.getBytes());
-        message.setQos(1);
+        message.setQos(2);
 
         System.out.println("Publishing message: " + payload);
 

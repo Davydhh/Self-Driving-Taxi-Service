@@ -80,7 +80,7 @@ public class Seta {
             });
 
             String[] subTopics = new String[] {"seta/smartcity/taxis/free", "seta/smartcity/rides/handled"};
-            int[] subQos = new int[] {1, 1};
+            int[] subQos = new int[] {2, 2};
 
             client.subscribe(subTopics, subQos);
 

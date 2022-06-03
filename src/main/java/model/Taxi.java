@@ -243,12 +243,6 @@ public class Taxi {
         }
     }
 
-    public boolean hasAlreadyInQueue(RideRequest request) {
-        synchronized (requests) {
-            return requests.contains(request);
-        }
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -310,9 +304,13 @@ public class Taxi {
             new HandleCharging(this).start();
         } else if (!requests.isEmpty()) {
             setState(TaxiState.HANDLING);
-            RideRequest pendingRequest = requests.poll();
+            RideRequest pendingRequest;
 
-            if (pendingRequest != null && getTopic().equals(Utils.getDistrictTopicFromPosition(pendingRequest.getStartPos()))) {
+            do {
+                pendingRequest = requests.poll();
+            } while (pendingRequest != null && !getTopic().equals(Utils.getDistrictTopicFromPosition(pendingRequest.getStartPos())));
+
+            if (pendingRequest != null) {
                 System.out.println("Getting request " + pendingRequest.getId() + " from queue");
                 try {
                     String payload = new Gson().toJson(pendingRequest);
@@ -327,6 +325,11 @@ public class Taxi {
                 }
 
                 new HandleElection(this, pendingRequest).start();
+            } else {
+                setState(TaxiState.FREE);
+                synchronized (getStateLock()) {
+                    getStateLock().notifyAll();
+                }
             }
         } else {
             setState(TaxiState.FREE);
@@ -670,7 +673,7 @@ public class Taxi {
         Taxi taxi = new Taxi(id, port, serverAddress);
         taxi.register();
 
-        taxi.startAcquiringData();
+//        taxi.startAcquiringData();
 
         new TaxiGrpcServer(taxi).start();
 
