@@ -42,9 +42,10 @@ public class HandleCharging extends Thread {
 
         List<TaxiBean> taxiList = new ArrayList<>(taxi.getOtherTaxis());
 
+        int size = taxiList.size();
+
         synchronized (counterLock) {
             if (taxiList.isEmpty()) {
-                taxi.setState(TaxiState.CHARGING);
                 taxi.recharge(station.getPosition());
             } else {
                 for (TaxiBean t : taxiList) {
@@ -64,8 +65,7 @@ public class HandleCharging extends Thread {
                                 synchronized (counterLock) {
                                     okCounter += 1;
 
-                                    if (okCounter == taxiList.size()) {
-                                        taxi.setState(TaxiState.CHARGING);
+                                    if (okCounter == size) {
                                         counterLock.notifyAll();
                                     }
                                 }
@@ -74,8 +74,13 @@ public class HandleCharging extends Thread {
 
                         @Override
                         public void onError(Throwable t) {
-                            t.printStackTrace();
-                            System.exit(0);
+                            synchronized (counterLock) {
+                                okCounter += 1;
+
+                                if (okCounter == taxiList.size()) {
+                                    counterLock.notifyAll();
+                                }
+                            }
                         }
 
                         @Override
@@ -85,22 +90,22 @@ public class HandleCharging extends Thread {
                     });
                 }
 
-                waitUntilReceiveAllOk(station);
+                waitUntilReceiveAllOk(station, size);
             }
         }
     }
 
-    private void waitUntilReceiveAllOk(ChargingStation station) {
+    private void waitUntilReceiveAllOk(ChargingStation station, int size) {
         System.out.println("Waiting for receiving ok for charging request for station " + station.getId());
 
-        while (taxi.getState() != TaxiState.CHARGING) {
+        while (okCounter < size) {
             try {
                 counterLock.wait();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
-            if (taxi.getState() == TaxiState.CHARGING) {
+            if (okCounter == size) {
                 taxi.recharge(station.getPosition());
             }
         }

@@ -58,9 +58,10 @@ public class HandleElection extends Thread {
 
         List<TaxiBean> taxiList = new ArrayList<>(taxi.getOtherTaxis());
 
+        int size = taxiList.size();
+
         if (taxiList.isEmpty()) {
             System.out.println("\nTaxi " + taxi.getId() + " takes charge of the ride " + request.getId());
-            taxi.setState(TaxiState.BUSY);
             taxi.drive(request);
         } else {
             synchronized (counterLock) {
@@ -86,8 +87,7 @@ public class HandleElection extends Thread {
                                 synchronized (counterLock) {
                                     okCounter += 1;
 
-                                    if (okCounter == taxiList.size()) {
-                                        taxi.setState(TaxiState.BUSY);
+                                    if (okCounter == size) {
                                         counterLock.notifyAll();
                                     }
                                 }
@@ -102,8 +102,7 @@ public class HandleElection extends Thread {
                             synchronized (counterLock) {
                                 okCounter += 1;
 
-                                if (okCounter == taxiList.size()) {
-                                    taxi.setState(TaxiState.BUSY);
+                                if (okCounter == size) {
                                     counterLock.notifyAll();
                                 }
                             }
@@ -116,22 +115,22 @@ public class HandleElection extends Thread {
                     });
                 }
 
-                waitUntilReceiveAllOk();
+                waitUntilReceiveAllOk(size);
             }
         }
     }
 
-    private void waitUntilReceiveAllOk() {
+    private void waitUntilReceiveAllOk(int size) {
         System.out.println("\nTaxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
 
-        while (taxi.getState() != TaxiState.BUSY) {
+        while (okCounter < size) {
             try {
                 counterLock.wait();
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
-            if (taxi.getState() == TaxiState.BUSY && taxi.getRequestId() == request.getId()) {
+            if (okCounter == size && taxi.getRequestId() == request.getId()) {
                 System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
                 taxi.drive(request);
             }

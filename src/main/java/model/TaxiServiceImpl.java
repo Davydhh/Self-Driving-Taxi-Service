@@ -18,7 +18,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
     }
 
     public void addTaxi(Taxi.TaxiMessage message,
-                                     StreamObserver<Taxi.AddTaxiResponseMessage> responseObserver) {
+                        StreamObserver<Taxi.AddTaxiResponseMessage> responseObserver) {
         TaxiBean taxiBean = new TaxiBean(message.getId(), message.getPort(), message.getIp());
         taxi.addTaxi(taxiBean);
         List<TaxiBean> taxiList = taxi.getOtherTaxis();

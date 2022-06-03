@@ -293,7 +293,8 @@ public class Taxi {
     }
 
     public void drive(RideRequest request) {
-        System.out.println("Handling ride...");
+        System.out.println("\nHandling ride...");
+        setState(TaxiState.BUSY);
         double distance = Utils.getDistance(startPos, request.getEndPos());
         try {
             Thread.sleep(5000);
@@ -356,6 +357,7 @@ public class Taxi {
     }
 
     public void recharge(Point stationPosition) {
+        setState(TaxiState.CHARGING);
         double distance = Utils.getDistance(startPos, stationPosition);
         dischargeBattery((int) Math.round(distance));
         incrementKm(distance);
