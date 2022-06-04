@@ -79,6 +79,8 @@ public class Taxi {
 
     private final Queue<RideRequest> requests;
 
+    private final List<RideRequest> requestsHandled;
+
     private final Object otherTaxisLock;
 
     private final Object topicLock;
@@ -106,6 +108,7 @@ public class Taxi {
         this.rechargeStationId = -1;
         this.rides = 0;
         this.km = 0;
+        this.requestsHandled = new ArrayList<>();
         this.leaving = false;
         this.requests = new LinkedList<>();
         this.buffer = new TaxiBuffer();
@@ -238,8 +241,10 @@ public class Taxi {
 
     public void addRequest(RideRequest request){
         synchronized (requests) {
-            if (!requests.contains(request)) {
-                requests.offer(request);
+            synchronized (requestsHandled) {
+                if (!requests.contains(request) && !requestsHandled.contains(request)) {
+                    requests.offer(request);
+                }
             }
         }
     }
@@ -247,6 +252,19 @@ public class Taxi {
     public void removeRequest(RideRequest request) {
         synchronized (requests) {
             requests.remove(request);
+            addHandledRequest(request);
+        }
+    }
+
+    public void addHandledRequest(RideRequest request) {
+        synchronized (requestsHandled) {
+            requestsHandled.add(request);
+        }
+    }
+
+    public void removeHandledRequest(RideRequest request) {
+        synchronized (requestsHandled) {
+            requestsHandled.remove(request);
         }
     }
 
@@ -494,27 +512,31 @@ public class Taxi {
 
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
-                addRequest(rideRequest);
-
-                if (getState() == TaxiState.FREE) {
-                    setState(TaxiState.HANDLING_RIDE);
-
-                    try {
-                        mqttClient.publish("seta/smartcity/rides/handled", message);
-                    } catch (MqttException e) {
-                        System.out.println("reason " + e.getReasonCode());
-                        System.out.println("msg " + e.getMessage());
-                        System.out.println("loc " + e.getLocalizedMessage());
-                        System.out.println("cause " + e.getCause());
-                        System.out.println("excep " + e);
-                        e.printStackTrace();
-                    }
-
-                    electionThread = new HandleElection(taxi, rideRequest);
-                    electionThread.start();
+                if (topic.equals("seta/smartcity/rides/removed")) {
+                    removeHandledRequest(rideRequest);
                 } else {
-                    System.out.println("Taxi " + id + " is already driving or charging or in " +
-                            "mutual exclusion for charging or has already the request in queue");
+                    addRequest(rideRequest);
+
+                    if (getState() == TaxiState.FREE) {
+                        setState(TaxiState.HANDLING_RIDE);
+
+                        try {
+                            mqttClient.publish("seta/smartcity/rides/handled", message);
+                        } catch (MqttException e) {
+                            System.out.println("reason " + e.getReasonCode());
+                            System.out.println("msg " + e.getMessage());
+                            System.out.println("loc " + e.getLocalizedMessage());
+                            System.out.println("cause " + e.getCause());
+                            System.out.println("excep " + e);
+                            e.printStackTrace();
+                        }
+
+                        electionThread = new HandleElection(taxi, rideRequest);
+                        electionThread.start();
+                    } else {
+                        System.out.println("Taxi " + id + " is already driving or charging or in " +
+                                "mutual exclusion for charging or has already the request in queue");
+                    }
                 }
             }
 
@@ -526,6 +548,13 @@ public class Taxi {
                 // Not used
             }
         });
+
+        try {
+            mqttClient.subscribe("seta/smartcity/rides/removed", 2);
+            System.out.println("Subscribed to topic: seta/smartcity/rides/removed");
+        } catch (MqttException ex) {
+            ex.printStackTrace();
+        }
     }
 
     public void subMqttTopic() {

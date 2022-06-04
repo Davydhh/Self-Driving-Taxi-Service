@@ -72,6 +72,17 @@ public class Seta {
                             requestsByTopic.remove(rideRequest);
                             System.out.println("\nRequest " + rideRequest.getId() + " removed");
                             System.out.println("Seta requests: " + requests);
+
+                            try {
+                                client.publish("seta/smartcity/rides/removed", message);
+                            } catch (MqttException e) {
+                                System.out.println("reason " + e.getReasonCode());
+                                System.out.println("msg " + e.getMessage());
+                                System.out.println("loc " + e.getLocalizedMessage());
+                                System.out.println("cause " + e.getCause());
+                                System.out.println("excep " + e);
+                                e.printStackTrace();
+                            }
                         }
                     }
                 }
