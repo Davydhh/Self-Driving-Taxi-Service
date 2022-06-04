@@ -338,23 +338,7 @@ public class Taxi {
             } while (pendingRequest != null && !getTopic().equals(Utils.getDistrictTopicFromPosition(pendingRequest.getStartPos())));
 
             if (pendingRequest != null) {
-                System.out.println("Getting request " + pendingRequest.getId() + " from queue");
-                try {
-                    String payload = new Gson().toJson(pendingRequest);
-                    MqttMessage message = new MqttMessage(payload.getBytes());
-                    message.setQos(2);
-                    mqttClient.publish("seta/smartcity/rides/handled", message);
-                } catch (MqttException e) {
-                    System.out.println("reason " + e.getReasonCode());
-                    System.out.println("msg " + e.getMessage());
-                    System.out.println("loc " + e.getLocalizedMessage());
-                    System.out.println("cause " + e.getCause());
-                    System.out.println("excep " + e);
-                    e.printStackTrace();
-                }
-
-                electionThread = new HandleElection(this, pendingRequest);
-                electionThread.start();
+                handlePendingRequest(pendingRequest);
             } else {
                 setState(TaxiState.FREE);
                 synchronized (getStateLock()) {
@@ -367,6 +351,26 @@ public class Taxi {
                 getStateLock().notifyAll();
             }
         }
+    }
+
+    private void handlePendingRequest(RideRequest pendingRequest) {
+        System.out.println("Getting request " + pendingRequest.getId() + " from queue");
+        try {
+            String payload = new Gson().toJson(pendingRequest);
+            MqttMessage message = new MqttMessage(payload.getBytes());
+            message.setQos(2);
+            mqttClient.publish("seta/smartcity/rides/handled", message);
+        } catch (MqttException e) {
+            System.out.println("reason " + e.getReasonCode());
+            System.out.println("msg " + e.getMessage());
+            System.out.println("loc " + e.getLocalizedMessage());
+            System.out.println("cause " + e.getCause());
+            System.out.println("excep " + e);
+            e.printStackTrace();
+        }
+
+        electionThread = new HandleElection(this, pendingRequest);
+        electionThread.start();
     }
 
     public void recharge(Point stationPosition) {
@@ -395,23 +399,7 @@ public class Taxi {
             } while (pendingRequest != null && !getTopic().equals(Utils.getDistrictTopicFromPosition(pendingRequest.getStartPos())));
 
             if (pendingRequest != null) {
-                System.out.println("Getting request " + pendingRequest.getId() + " from queue");
-                try {
-                    String payload = new Gson().toJson(pendingRequest);
-                    MqttMessage message = new MqttMessage(payload.getBytes());
-                    message.setQos(2);
-                    mqttClient.publish("seta/smartcity/rides/handled", message);
-                } catch (MqttException e) {
-                    System.out.println("reason " + e.getReasonCode());
-                    System.out.println("msg " + e.getMessage());
-                    System.out.println("loc " + e.getLocalizedMessage());
-                    System.out.println("cause " + e.getCause());
-                    System.out.println("excep " + e);
-                    e.printStackTrace();
-                }
-
-                electionThread = new HandleElection(this, pendingRequest);
-                electionThread.start();
+                handlePendingRequest(pendingRequest);
             }
         } else {
             setState(TaxiState.FREE);
@@ -642,7 +630,6 @@ public class Taxi {
                 @Override
                 public void onError(Throwable t) {
                     t.printStackTrace();
-                    System.out.println(0);
                 }
 
                 @Override
