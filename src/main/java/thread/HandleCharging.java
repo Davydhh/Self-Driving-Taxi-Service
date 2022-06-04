@@ -5,7 +5,6 @@ import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import model.ChargingStation;
 import model.Taxi;
-import model.TaxiState;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi.ChargingRequestMessage;
 import seta.proto.taxi.TaxiServiceGrpc;

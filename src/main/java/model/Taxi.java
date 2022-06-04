@@ -306,11 +306,11 @@ public class Taxi {
 
         if (battery < 30) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
-            setState(TaxiState.LOW);
+            setState(TaxiState.NEED_RECHARGE);
             chargingThread = new HandleCharging(this);
             chargingThread.start();
         } else if (!requests.isEmpty()) {
-            setState(TaxiState.HANDLING);
+            setState(TaxiState.HANDLING_RIDE);
             RideRequest pendingRequest;
 
             do {
@@ -367,7 +367,7 @@ public class Taxi {
         setBattery(100);
 
         if (!requests.isEmpty()) {
-            setState(TaxiState.HANDLING);
+            setState(TaxiState.HANDLING_RIDE);
             RideRequest pendingRequest;
 
             do {
@@ -495,7 +495,7 @@ public class Taxi {
                 addRequest(rideRequest);
 
                 if (getState() == TaxiState.FREE) {
-                    setState(TaxiState.HANDLING);
+                    setState(TaxiState.HANDLING_RIDE);
 
                     try {
                         mqttClient.publish("seta/smartcity/rides/handled", message);

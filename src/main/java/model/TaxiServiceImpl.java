@@ -77,7 +77,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                 taxi.removeRequest(new RideRequest(rideRequest.getId(),
                         new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY()),
                         new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
-            } else if (taxi.getState() == TaxiState.LOW) {
+            } else if (taxi.getState() == TaxiState.NEED_RECHARGE) {
                 System.out.println("Taxi " + taxi.getId() + " is low");
 
                 response = Taxi.ElectionResponseMessage.newBuilder().setOk(true).build();
