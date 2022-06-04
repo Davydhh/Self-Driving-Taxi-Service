@@ -65,6 +65,8 @@ public class Taxi {
 
     private double km;
 
+    private boolean leaving;
+
     private ComputeTaxiStatistics statisticsThread;
 
     private HandleCharging chargingThread;
@@ -104,6 +106,7 @@ public class Taxi {
         this.rechargeStationId = -1;
         this.rides = 0;
         this.km = 0;
+        this.leaving = false;
         this.requests = new LinkedList<>();
         this.buffer = new TaxiBuffer();
         this.batteryLock = new Object();
@@ -244,7 +247,6 @@ public class Taxi {
     public void removeRequest(RideRequest request) {
         synchronized (requests) {
             requests.remove(request);
-            System.out.println("Queue: " + requests);
         }
     }
 
@@ -309,7 +311,7 @@ public class Taxi {
             setState(TaxiState.NEED_RECHARGE);
             chargingThread = new HandleCharging(this);
             chargingThread.start();
-        } else if (!requests.isEmpty()) {
+        } else if (!requests.isEmpty() && !leaving) {
             setState(TaxiState.HANDLING_RIDE);
             RideRequest pendingRequest;
 
@@ -366,7 +368,7 @@ public class Taxi {
         setRechargeStationId(-1);
         setBattery(100);
 
-        if (!requests.isEmpty()) {
+        if (!requests.isEmpty() && !leaving) {
             setState(TaxiState.HANDLING_RIDE);
             RideRequest pendingRequest;
 
@@ -769,6 +771,8 @@ public class Taxi {
                 }
             }
         } while (!action.equals("quit"));
+
+        taxi.leaving = true;
 
         synchronized (taxi.getStateLock()) {
             if (taxi.getState() == TaxiState.FREE) {
