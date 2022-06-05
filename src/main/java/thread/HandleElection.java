@@ -4,7 +4,6 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import model.Taxi;
-import model.TaxiState;
 import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi.ElectionRequestMessage;
@@ -80,8 +79,8 @@ public class HandleElection extends Thread {
                                         "Taxi " + t.getId() + " about request " + request.getId());
                                 taxi.removeRequest(request);
                                 if (taxi.getState() == HANDLING_RIDE && taxi.getRequestId() == request.getId()) {
-                                    taxi.setState(TaxiState.FREE);
                                     taxi.setRequestId(-1);
+                                    taxi.handlePendingRequests();
                                 }
 
                                 synchronized (counterLock) {
