@@ -209,6 +209,10 @@ public class Taxi {
                 System.out.println("excep " + e);
                 e.printStackTrace();
             }
+
+            synchronized (stateLock) {
+                stateLock.notifyAll();
+            }
         }
     }
 
@@ -341,15 +345,9 @@ public class Taxi {
                 handlePendingRequest(pendingRequest);
             } else {
                 setState(TaxiState.FREE);
-                synchronized (getStateLock()) {
-                    getStateLock().notifyAll();
-                }
             }
         } else {
             setState(TaxiState.FREE);
-            synchronized (getStateLock()) {
-                getStateLock().notifyAll();
-            }
         }
     }
 
@@ -403,10 +401,6 @@ public class Taxi {
             }
         } else {
             setState(TaxiState.FREE);
-
-            synchronized (getStateLock()) {
-                getStateLock().notifyAll();
-            }
         }
     }
 
@@ -428,6 +422,7 @@ public class Taxi {
             startPos = responseBody.getStarPos();
             otherTaxis = responseBody.getTaxis();
         } else {
+            System.out.println("\nRegistration unsuccessful");
             System.exit(0);
         }
     }
@@ -613,7 +608,6 @@ public class Taxi {
         for (TaxiBean t: getOtherTaxis()) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            System.out.println("Taxi " + id + " connected to address " + t.getIp() + ":" + t.getPort());
             TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
                     seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
@@ -645,7 +639,6 @@ public class Taxi {
         for (TaxiBean t: getOtherTaxis()) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            System.out.println("Taxi " + id + " connected to address " + t.getIp() + ":" + t.getPort());
             TaxiServiceGrpc.TaxiServiceBlockingStub stub = TaxiServiceGrpc.newBlockingStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
                     seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
