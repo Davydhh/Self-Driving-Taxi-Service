@@ -15,6 +15,7 @@ import seta.proto.taxi.TaxiServiceGrpc;
 import java.util.ArrayList;
 import java.util.List;
 
+import static model.TaxiState.HANDLING_RIDE;
 import static util.Utils.getDistance;
 
 public class HandleElection extends Thread {
@@ -78,8 +79,10 @@ public class HandleElection extends Thread {
                                 System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
                                         "Taxi " + t.getId() + " about request " + request.getId());
                                 taxi.removeRequest(request);
-                                taxi.setState(TaxiState.FREE);
-                                taxi.setRequestId(-1);
+                                if (taxi.getState() == HANDLING_RIDE && taxi.getRequestId() == request.getId()) {
+                                    taxi.setState(TaxiState.FREE);
+                                    taxi.setRequestId(-1);
+                                }
                             } else {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
                                         + " about request " + request.getId());

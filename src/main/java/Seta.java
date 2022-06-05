@@ -41,10 +41,13 @@ public class Seta {
 
                     if (topic.equals("seta/smartcity/taxis/free")) {
                         System.out.println("Taxis available on topic " + receivedMessage);
-                        RideRequest r;
+                        RideRequest r = null;
 
                         synchronized (requests) {
-                            r = requests.get(receivedMessage).poll();
+                            Queue<RideRequest> queue = requests.get(receivedMessage);
+                            if (queue != null) {
+                                r = queue.peek();
+                            }
                         }
 
                         if (r != null) {
@@ -66,22 +69,24 @@ public class Seta {
                         RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
                         String requestTopic =
                                 Utils.getDistrictTopicFromPosition(rideRequest.getStartPos());
-                        Queue<RideRequest> requestsByTopic = requests.get(requestTopic);
 
-                        if (requestsByTopic != null && !requestsByTopic.isEmpty()) {
-                            requestsByTopic.remove(rideRequest);
-                            System.out.println("\nRequest " + rideRequest.getId() + " removed");
-                            System.out.println("Seta requests: " + requests);
+                        synchronized (requests) {
+                            Queue<RideRequest> requestsByTopic = requests.get(requestTopic);
 
-                            try {
-                                client.publish("seta/smartcity/rides/removed", message);
-                            } catch (MqttException e) {
-                                System.out.println("reason " + e.getReasonCode());
-                                System.out.println("msg " + e.getMessage());
-                                System.out.println("loc " + e.getLocalizedMessage());
-                                System.out.println("cause " + e.getCause());
-                                System.out.println("excep " + e);
-                                e.printStackTrace();
+                            if (requestsByTopic != null && requestsByTopic.remove(rideRequest)) {
+                                System.out.println("\nRequest " + rideRequest.getId() + " removed");
+                                System.out.println("Seta requests: " + requests);
+
+                                try {
+                                    client.publish("seta/smartcity/rides/removed", message);
+                                } catch (MqttException e) {
+                                    System.out.println("reason " + e.getReasonCode());
+                                    System.out.println("msg " + e.getMessage());
+                                    System.out.println("loc " + e.getLocalizedMessage());
+                                    System.out.println("cause " + e.getCause());
+                                    System.out.println("excep " + e);
+                                    e.printStackTrace();
+                                }
                             }
                         }
                     }

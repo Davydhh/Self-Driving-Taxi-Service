@@ -501,6 +501,7 @@ public class Taxi {
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
                 if (topic.equals("seta/smartcity/rides/removed")) {
+                    removeRequest(rideRequest);
                     removeHandledRequest(rideRequest);
                 } else {
                     addRequest(rideRequest);
@@ -523,7 +524,7 @@ public class Taxi {
                         electionThread.start();
                     } else {
                         System.out.println("Taxi " + id + " is already driving or charging or in " +
-                                "mutual exclusion for charging or has already the request in queue");
+                                "mutual exclusion for charging or is leaving");
                     }
                 }
             }
@@ -593,8 +594,8 @@ public class Taxi {
 
     public void mqttDisconnect() {
         try {
-            System.out.println("\nMqtt disconnect");
             mqttClient.disconnect();
+            System.out.println("\nMqtt disconnect");
         } catch (MqttException ex) {
             ex.printStackTrace();
             System.out.println("Error in mqtt disconnection");
