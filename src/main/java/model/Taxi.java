@@ -766,13 +766,14 @@ public class Taxi {
                         taxi.chargingThread.start();
                     } else {
                         while (taxi.getState() != TaxiState.FREE) {
+                            System.out.println("Wait until all operations finish before charging");
                             try {
                                 taxi.getStateLock().wait();
                             } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
 
-                            if (taxi.getState() == TaxiState.FREE) {
+                            if (taxi.getState() == TaxiState.FREE && !taxi.leaving) {
                                 taxi.chargingThread = new HandleCharging(taxi);
                                 taxi.chargingThread.start();
                             }
@@ -789,7 +790,7 @@ public class Taxi {
                 taxi.leave();
             } else {
                 while (taxi.getState() != TaxiState.FREE && taxi.getState() != TaxiState.LEAVING) {
-                    System.out.println("Wait until all operations finish");
+                    System.out.println("Wait until all operations finish before leaving");
                     try {
                         taxi.getStateLock().wait();
                     } catch (InterruptedException e) {

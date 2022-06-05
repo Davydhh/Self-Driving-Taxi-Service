@@ -97,16 +97,14 @@ public class HandleCharging extends Thread {
     private void waitUntilReceiveAllOk(ChargingStation station, int size) {
         System.out.println("Waiting for receiving ok for charging request for station " + station.getId());
 
-        while (okCounter < size) {
-            try {
-                counterLock.wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        try {
+            counterLock.wait();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
-            if (okCounter == size) {
-                taxi.recharge(station.getPosition());
-            }
+        if (okCounter == size) {
+            taxi.recharge(station.getPosition());
         }
     }
 }

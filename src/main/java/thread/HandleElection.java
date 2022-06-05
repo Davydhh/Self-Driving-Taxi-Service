@@ -83,6 +83,10 @@ public class HandleElection extends Thread {
                                     taxi.setState(TaxiState.FREE);
                                     taxi.setRequestId(-1);
                                 }
+
+                                synchronized (counterLock) {
+                                    notifyAll();
+                                }
                             } else {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
                                         + " about request " + request.getId());
@@ -126,17 +130,15 @@ public class HandleElection extends Thread {
     private void waitUntilReceiveAllOk(int size) {
         System.out.println("\nTaxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
 
-        while (okCounter < size) {
-            try {
-                counterLock.wait();
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+        try {
+            counterLock.wait();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
-            if (okCounter == size && taxi.getRequestId() == request.getId()) {
-                System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
-                taxi.drive(request);
-            }
+        if (okCounter == size && taxi.getRequestId() == request.getId()) {
+            System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
+            taxi.drive(request);
         }
     }
 }
