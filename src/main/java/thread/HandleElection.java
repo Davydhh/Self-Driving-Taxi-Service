@@ -84,7 +84,7 @@ public class HandleElection extends Thread {
                                 }
 
                                 synchronized (counterLock) {
-                                    notifyAll();
+                                    counterLock.notifyAll();
                                 }
                             } else {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()

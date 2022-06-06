@@ -312,6 +312,11 @@ public class Taxi {
     public void drive(RideRequest request) {
         System.out.println("\nHandling ride...");
         setState(TaxiState.BUSY);
+
+        synchronized (stateLock) {
+            stateLock.notifyAll();
+        }
+
         double distance = Utils.getDistance(startPos, request.getEndPos());
         try {
             Thread.sleep(5000);
