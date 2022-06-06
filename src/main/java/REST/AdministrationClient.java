@@ -57,8 +57,7 @@ public class AdministrationClient {
             } catch (InputMismatchException ex){
                 System.out.println("\nInsert a number!");
                 scanner.next();
-            }
-            catch (Exception ex){
+            } catch (Exception ex){
                 ex.printStackTrace();
                 scanner.next();
             }
