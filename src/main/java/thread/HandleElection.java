@@ -132,7 +132,7 @@ public class HandleElection extends Thread {
             e.printStackTrace();
         }
 
-        if (taxi.getOkCounter() == size && taxi.getRequestId() == request.getId()) {
+        if (taxi.getOkCounter() == size && taxi.getRequestId() == request.getId() && !taxi.isLeaving()) {
             System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
             taxi.drive(request);
         } else if (taxi.isLeaving()) {
