@@ -403,7 +403,7 @@ public class Taxi {
             e.printStackTrace();
         }
 
-        if (battery < 30) {
+        if (battery < 30 && !isLeaving()) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
             setState(TaxiState.NEED_RECHARGE);
             chargingThread = new HandleCharging(this);
