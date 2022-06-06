@@ -91,6 +91,10 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                 System.out.println("Taxi " + taxiId + " is leaving");
 
                 sendResponse(true, responseObserver);
+            } else if (taxi.getState() == TaxiState.HANDLING_RIDE && taxi.getRequestId() != requestId) {
+                System.out.println("Taxi " + taxiId + " is handling another ride");
+
+                sendResponse(true, responseObserver);
             } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestId() == requestId) {
                 System.out.println("Taxi " + taxiId + " is already driving for request " + taxi.getRequestId());
 
@@ -189,9 +193,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
             }
 
             if (taxi.getState() == TaxiState.BUSY) {
-                System.out.println("\nTaxi won the election for the ride " + requestId + ". Send " +
-                        "no to other taxis");
-                sendResponse(false, responseObserver);
+                sendResponse(taxi.isLeaving(), responseObserver);
             }
         }
     }

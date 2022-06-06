@@ -67,6 +67,8 @@ public class Taxi {
 
     private boolean leaving;
 
+    private int okCounter;
+
     private ComputeTaxiStatistics statisticsThread;
 
     private HandleCharging chargingThread;
@@ -97,6 +99,10 @@ public class Taxi {
 
     private final Object statisticsLock;
 
+    private final Object leavingLock;
+
+    private final Object okCounterLock;
+
     public Taxi(int id, int port, String serverAddress) {
         this.id = id;
         this.port = port;
@@ -120,6 +126,8 @@ public class Taxi {
         this.startPosLock = new Object();
         this.kmLock = new Object();
         this.statisticsLock = new Object();
+        this.leavingLock = new Object();
+        this.okCounterLock = new Object();
     }
 
     public TaxiState getState() {
@@ -190,6 +198,52 @@ public class Taxi {
         return statisticsLock;
     }
 
+    public Queue<RideRequest> getRequests() {
+        synchronized (requests) {
+            return requests;
+        }
+    }
+
+    public List<RideRequest> getRequestsHandled() {
+        synchronized (requestsHandled) {
+            return requestsHandled;
+        }
+    }
+
+    public boolean isLeaving() {
+        synchronized (leavingLock) {
+            return leaving;
+        }
+    }
+
+    public void setLeaving(boolean leaving) {
+        synchronized (leavingLock) {
+            this.leaving = leaving;
+        }
+    }
+
+    public int getOkCounter() {
+        synchronized (okCounterLock) {
+            return okCounter;
+        }
+    }
+
+    public Object getOkCounterLock() {
+        return okCounterLock;
+    }
+
+    public void incrementCounter() {
+        synchronized (okCounterLock) {
+            this.okCounter += 1;
+        }
+    }
+
+    public void resetOkCounter() {
+        synchronized (okCounterLock) {
+            this.okCounter = 0;
+        }
+    }
+
     public void setState(TaxiState value) {
         synchronized (stateLock) {
             this.state = value;
@@ -197,17 +251,19 @@ public class Taxi {
         }
 
         if (value == TaxiState.FREE) {
-            MqttMessage message = new MqttMessage(getTopic().getBytes());
-            message.setQos(2);
-            try {
-                mqttClient.publish("seta/smartcity/taxis/free", message);
-            } catch (MqttException e) {
-                System.out.println("reason " + e.getReasonCode());
-                System.out.println("msg " + e.getMessage());
-                System.out.println("loc " + e.getLocalizedMessage());
-                System.out.println("cause " + e.getCause());
-                System.out.println("excep " + e);
-                e.printStackTrace();
+            if (!isLeaving()) {
+                MqttMessage message = new MqttMessage(getTopic().getBytes());
+                message.setQos(2);
+                try {
+                    mqttClient.publish("seta/smartcity/taxis/free", message);
+                } catch (MqttException e) {
+                    System.out.println("reason " + e.getReasonCode());
+                    System.out.println("msg " + e.getMessage());
+                    System.out.println("loc " + e.getLocalizedMessage());
+                    System.out.println("cause " + e.getCause());
+                    System.out.println("excep " + e);
+                    e.printStackTrace();
+                }
             }
 
             synchronized (stateLock) {
@@ -333,12 +389,26 @@ public class Taxi {
         incrementRides();
         System.out.println("Request " + request.getId() + " completed");
 
+        try {
+            String payload = new Gson().toJson(request);
+            MqttMessage message = new MqttMessage(payload.getBytes());
+            message.setQos(2);
+            mqttClient.publish("seta/smartcity/rides/handled", message);
+        } catch (MqttException e) {
+            System.out.println("reason " + e.getReasonCode());
+            System.out.println("msg " + e.getMessage());
+            System.out.println("loc " + e.getLocalizedMessage());
+            System.out.println("cause " + e.getCause());
+            System.out.println("excep " + e);
+            e.printStackTrace();
+        }
+
         if (battery < 30) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
             setState(TaxiState.NEED_RECHARGE);
             chargingThread = new HandleCharging(this);
             chargingThread.start();
-        } else if (!requests.isEmpty() && !leaving) {
+        } else if (!requests.isEmpty() && !isLeaving()) {
             setState(TaxiState.HANDLING_RIDE);
             handlePendingRequests();
         } else {
@@ -355,20 +425,6 @@ public class Taxi {
 
         if (pendingRequest != null) {
             System.out.println("Getting request " + pendingRequest.getId() + " from queue");
-            try {
-                String payload = new Gson().toJson(pendingRequest);
-                MqttMessage message = new MqttMessage(payload.getBytes());
-                message.setQos(2);
-                mqttClient.publish("seta/smartcity/rides/handled", message);
-            } catch (MqttException e) {
-                System.out.println("reason " + e.getReasonCode());
-                System.out.println("msg " + e.getMessage());
-                System.out.println("loc " + e.getLocalizedMessage());
-                System.out.println("cause " + e.getCause());
-                System.out.println("excep " + e);
-                e.printStackTrace();
-            }
-
             electionThread = new HandleElection(this, pendingRequest);
             electionThread.start();
         } else {
@@ -393,33 +449,9 @@ public class Taxi {
         setRechargeStationId(-1);
         setBattery(100);
 
-        if (!requests.isEmpty() && !leaving) {
+        if (!requests.isEmpty() && !isLeaving()) {
             setState(TaxiState.HANDLING_RIDE);
-            RideRequest pendingRequest;
-
-            do {
-                pendingRequest = requests.poll();
-            } while (pendingRequest != null && !getTopic().equals(Utils.getDistrictTopicFromPosition(pendingRequest.getStartPos())));
-
-            if (pendingRequest != null) {
-                System.out.println("Getting request " + pendingRequest.getId() + " from queue");
-                try {
-                    String payload = new Gson().toJson(pendingRequest);
-                    MqttMessage message = new MqttMessage(payload.getBytes());
-                    message.setQos(2);
-                    mqttClient.publish("seta/smartcity/rides/handled", message);
-                } catch (MqttException e) {
-                    System.out.println("reason " + e.getReasonCode());
-                    System.out.println("msg " + e.getMessage());
-                    System.out.println("loc " + e.getLocalizedMessage());
-                    System.out.println("cause " + e.getCause());
-                    System.out.println("excep " + e);
-                    e.printStackTrace();
-                }
-
-                electionThread = new HandleElection(this, pendingRequest);
-                electionThread.start();
-            }
+            handlePendingRequests();
         } else {
             setState(TaxiState.FREE);
         }
@@ -508,33 +540,20 @@ public class Taxi {
 
             public void messageArrived(String topic, MqttMessage message) {
                 String receivedMessage = new String(message.getPayload());
-                System.out.println("--------------------------------");
-                System.out.println("Taxi " + id + " received a Message!" +
-                        "\n\tTopic:   " + topic +
-                        "\n\tMessage: " + receivedMessage +
-                        "\n\tQoS:     " + message.getQos() + "\n");
-
                 RideRequest rideRequest = new Gson().fromJson(receivedMessage, RideRequest.class);
 
                 if (topic.equals("seta/smartcity/rides/removed")) {
                     removeRequest(rideRequest);
                     removeHandledRequest(rideRequest);
                 } else {
-                    addRequest(rideRequest);
+                    System.out.println("--------------------------------");
+                    System.out.println("Taxi " + id + " received a Message!" +
+                            "\n\tTopic:   " + topic +
+                            "\n\tMessage: " + receivedMessage +
+                            "\n\tQoS:     " + message.getQos() + "\n");
 
-                    if (getState() == TaxiState.FREE) {
+                    if (getState() == TaxiState.FREE && !taxi.getRequests().contains(rideRequest) && !taxi.getRequestsHandled().contains(rideRequest)) {
                         setState(TaxiState.HANDLING_RIDE);
-
-                        try {
-                            mqttClient.publish("seta/smartcity/rides/handled", message);
-                        } catch (MqttException e) {
-                            System.out.println("reason " + e.getReasonCode());
-                            System.out.println("msg " + e.getMessage());
-                            System.out.println("loc " + e.getLocalizedMessage());
-                            System.out.println("cause " + e.getCause());
-                            System.out.println("excep " + e);
-                            e.printStackTrace();
-                        }
 
                         electionThread = new HandleElection(taxi, rideRequest);
                         electionThread.start();
@@ -542,6 +561,8 @@ public class Taxi {
                         System.out.println("Taxi " + id + " is already driving or charging or in " +
                                 "mutual exclusion for charging or is leaving");
                     }
+
+                    addRequest(rideRequest);
                 }
             }
 
@@ -793,7 +814,7 @@ public class Taxi {
                                 e.printStackTrace();
                             }
 
-                            if (taxi.getState() == TaxiState.FREE && !taxi.leaving) {
+                            if (taxi.getState() == TaxiState.FREE && !taxi.isLeaving()) {
                                 taxi.chargingThread = new HandleCharging(taxi);
                                 taxi.chargingThread.start();
                             }
@@ -803,23 +824,29 @@ public class Taxi {
             }
         } while (!action.equals("quit"));
 
-        taxi.leaving = true;
+        taxi.setLeaving(true);
 
-        synchronized (taxi.getStateLock()) {
-            if (taxi.getState() == TaxiState.FREE) {
-                taxi.leave();
-            } else {
-                while (taxi.getState() != TaxiState.FREE && taxi.getState() != TaxiState.LEAVING) {
+        if (taxi.getState() == TaxiState.FREE) {
+            taxi.leave();
+        } else  {
+            while (taxi.getState() != TaxiState.FREE && taxi.getState() != TaxiState.LEAVING) {
+                if (taxi.getState() == TaxiState.HANDLING_RIDE) {
+                    synchronized (taxi.getOkCounterLock()) {
+                        taxi.getOkCounterLock().notifyAll();
+                    }
+                }
+
+                synchronized (taxi.getStateLock()) {
                     System.out.println("Wait until all operations finish before leaving");
                     try {
                         taxi.getStateLock().wait();
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
+                }
 
-                    if (taxi.getState() == TaxiState.FREE) {
-                        taxi.leave();
-                    }
+                if (taxi.getState() == TaxiState.FREE) {
+                    taxi.leave();
                 }
             }
         }

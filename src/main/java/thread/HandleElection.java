@@ -4,6 +4,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.grpc.stub.StreamObserver;
 import model.Taxi;
+import model.TaxiState;
 import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi.ElectionRequestMessage;
@@ -22,21 +23,16 @@ public class HandleElection extends Thread {
 
     private final RideRequest request;
 
-    private int okCounter;
-
-    private final Object counterLock;
-
     public HandleElection(Taxi taxi, RideRequest request) {
         this.taxi = taxi;
         this.request = request;
-        this.okCounter = 0;
-        this.counterLock = new Object();
     }
 
     @Override
     public void run() {
         System.out.println("Starting election for request " + request.getId());
 
+        taxi.resetOkCounter();
         taxi.setRequestId(request.getId());
 
         double distance = getDistance(request.getStartPos(), taxi.getStartPos());
@@ -64,7 +60,7 @@ public class HandleElection extends Thread {
             System.out.println("\nTaxi " + taxi.getId() + " takes charge of the ride " + request.getId());
             taxi.drive(request);
         } else {
-            synchronized (counterLock) {
+            synchronized (taxi.getOkCounterLock()) {
                 for (TaxiBean t : taxiList) {
                     final ManagedChannel channel =
                             ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
@@ -83,18 +79,19 @@ public class HandleElection extends Thread {
                                     taxi.handlePendingRequests();
                                 }
 
-                                synchronized (counterLock) {
-                                    counterLock.notifyAll();
+                                synchronized (taxi.getOkCounterLock()) {
+                                    taxi.getOkCounterLock().notifyAll();
                                 }
                             } else {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
                                         + " about request " + request.getId());
 
-                                synchronized (counterLock) {
-                                    okCounter += 1;
+                                synchronized (taxi.getOkCounterLock()) {
+                                    taxi.incrementCounter();
 
-                                    if (okCounter == size) {
-                                        counterLock.notifyAll();
+                                    if (taxi.getOkCounter() == size) {
+                                        System.out.println("Received all ack!");
+                                        taxi.getOkCounterLock().notifyAll();
                                     }
                                 }
                             }
@@ -105,11 +102,11 @@ public class HandleElection extends Thread {
                             System.out.println("Taxi " + taxi.getId() + " received ok from a Taxi" +
                                     " that has leaved about request " + request.getId());
 
-                            synchronized (counterLock) {
-                                okCounter += 1;
+                            synchronized (taxi.getOkCounterLock()) {
+                                taxi.incrementCounter();
 
-                                if (okCounter == size) {
-                                    counterLock.notifyAll();
+                                if (taxi.getOkCounter() == size) {
+                                    taxi.getOkCounterLock().notifyAll();
                                 }
                             }
                         }
@@ -130,14 +127,22 @@ public class HandleElection extends Thread {
         System.out.println("\nTaxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
 
         try {
-            counterLock.wait();
+            taxi.getOkCounterLock().wait();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
 
-        if (okCounter == size && taxi.getRequestId() == request.getId()) {
+        if (taxi.getOkCounter() == size && taxi.getRequestId() == request.getId()) {
             System.out.println("Taxi " + taxi.getId() + " takes charge of the ride " + request.getId());
             taxi.drive(request);
+        } else if (taxi.isLeaving()) {
+            System.out.println("Taxi is leaving before election finished");
+            synchronized (taxi.getStateLock()) {
+                taxi.setState(TaxiState.BUSY);
+                taxi.getStateLock().notifyAll();
+
+                taxi.setState(TaxiState.FREE);
+            }
         }
     }
 }
