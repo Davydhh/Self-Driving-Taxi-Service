@@ -14,6 +14,7 @@ import seta.proto.taxi.TaxiServiceGrpc;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static model.TaxiState.HANDLING_RIDE;
 import static util.Utils.getDistance;
@@ -23,9 +24,31 @@ public class HandleElection extends Thread {
 
     private final RideRequest request;
 
+    private final List<Integer> taxiIdList;
+
+    private final ElectionRequestMessage electionRequest;
+
     public HandleElection(Taxi taxi, RideRequest request) {
         this.taxi = taxi;
         this.request = request;
+        this.taxiIdList = new ArrayList<>();
+        RideRequestMessage rideRequest = RideRequestMessage.newBuilder()
+                .setId(request.getId())
+                .setStartX(request.getStartPos().getX())
+                .setStartY(request.getStartPos().getY())
+                .setEndX(request.getEndPos().getX())
+                .setEndY(request.getEndPos().getY())
+                .build();
+        this.electionRequest = ElectionRequestMessage.newBuilder()
+                .setTaxiId(taxi.getId())
+                .setTaxiBattery(taxi.getBattery())
+                .setTaxiDistance(getDistance(request.getStartPos(), taxi.getStartPos()))
+                .setRideRequest(rideRequest)
+                .build();
+    }
+
+    public List<Integer> getTaxiIdList() {
+        return taxiIdList;
     }
 
     @Override
@@ -35,24 +58,8 @@ public class HandleElection extends Thread {
         taxi.resetOkCounter();
         taxi.setRequestId(request.getId());
 
-        double distance = getDistance(request.getStartPos(), taxi.getStartPos());
-
-        RideRequestMessage rideRequest = RideRequestMessage.newBuilder()
-                .setId(request.getId())
-                .setStartX(request.getStartPos().getX())
-                .setStartY(request.getStartPos().getY())
-                .setEndX(request.getEndPos().getX())
-                .setEndY(request.getEndPos().getY())
-                .build();
-
-        ElectionRequestMessage electionRequest = ElectionRequestMessage.newBuilder()
-                .setTaxiId(taxi.getId())
-                .setTaxiBattery(taxi.getBattery())
-                .setTaxiDistance(distance)
-                .setRideRequest(rideRequest)
-                .build();
-
         List<TaxiBean> taxiList = new ArrayList<>(taxi.getOtherTaxis());
+        taxiIdList.addAll(taxiList.stream().map(TaxiBean::getId).collect(Collectors.toList()));
 
         int size = taxiList.size();
 
@@ -143,6 +150,71 @@ public class HandleElection extends Thread {
 
                 taxi.setState(TaxiState.FREE);
             }
+        }
+    }
+
+    public void addTaxi(int addTaxiId) {
+        System.out.println("The Taxi " + addTaxiId + " has been added to election");
+
+        TaxiBean taxiToAdd =
+                taxi.getOtherTaxis().stream().filter(t -> t.getId() == addTaxiId).findFirst().orElse(null);
+
+        if (taxiToAdd != null) {
+            final ManagedChannel channel =
+                    ManagedChannelBuilder.forTarget(taxiToAdd.getIp() + ":" + taxiToAdd.getPort()).usePlaintext().build();
+            System.out.println("Taxi " + taxi.getId() + " send election to taxi " + addTaxiId + " about " +
+                    "request " + request.getId());
+            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
+
+            stub.sendElection(electionRequest, new StreamObserver<ElectionResponseMessage>() {
+                @Override
+                public void onNext(ElectionResponseMessage value) {
+                    if (!value.getOk()) {
+                        System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
+                                "Taxi " + taxiToAdd.getId() + " about request " + request.getId());
+                        taxi.removeRequest(request);
+                        if (taxi.getState() == HANDLING_RIDE && taxi.getRequestId() == request.getId()) {
+                            taxi.setRequestId(-1);
+                            taxi.handlePendingRequests();
+                        }
+
+                        synchronized (taxi.getOkCounterLock()) {
+                            taxi.getOkCounterLock().notifyAll();
+                        }
+                    } else {
+                        System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + taxiToAdd.getId()
+                                + " about request " + request.getId());
+
+                        synchronized (taxi.getOkCounterLock()) {
+                            taxi.incrementCounter();
+
+                            if (taxi.getOkCounter() == taxiIdList.size()) {
+                                System.out.println("Received all ack!");
+                                taxi.getOkCounterLock().notifyAll();
+                            }
+                        }
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    System.out.println("Taxi " + taxi.getId() + " received ok from a Taxi" +
+                            " that has leaved about request " + request.getId());
+
+                    synchronized (taxi.getOkCounterLock()) {
+                        taxi.incrementCounter();
+
+                        if (taxi.getOkCounter() == taxiIdList.size()) {
+                            taxi.getOkCounterLock().notifyAll();
+                        }
+                    }
+                }
+
+                @Override
+                public void onCompleted() {
+                    channel.shutdownNow();
+                }
+            });
         }
     }
 }

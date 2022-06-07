@@ -83,6 +83,8 @@ public class Taxi {
 
     private final List<RideRequest> requestsHandled;
 
+    private final Object electionThreadLock;
+
     private final Object otherTaxisLock;
 
     private final Object topicLock;
@@ -128,6 +130,7 @@ public class Taxi {
         this.statisticsLock = new Object();
         this.leavingLock = new Object();
         this.okCounterLock = new Object();
+        this.electionThreadLock = new Object();
     }
 
     public TaxiState getState() {
@@ -210,6 +213,18 @@ public class Taxi {
         }
     }
 
+    public HandleElection getElectionThread() {
+        synchronized (electionThreadLock) {
+            return electionThread;
+        }
+    }
+
+    public void setElectionThread(HandleElection electionThread) {
+        synchronized (electionThreadLock) {
+            this.electionThread = electionThread;
+        }
+    }
+
     public boolean isLeaving() {
         synchronized (leavingLock) {
             return leaving;
@@ -235,6 +250,12 @@ public class Taxi {
     public void incrementCounter() {
         synchronized (okCounterLock) {
             this.okCounter += 1;
+        }
+    }
+
+    public void decrementCounter() {
+        synchronized (okCounterLock) {
+            this.okCounter -= 1;
         }
     }
 
@@ -423,11 +444,17 @@ public class Taxi {
 
         if (pendingRequest != null) {
             System.out.println("Getting request " + pendingRequest.getId() + " from queue");
-            electionThread = new HandleElection(this, pendingRequest);
-            electionThread.start();
+            startRideElection(this, pendingRequest);
         } else {
             setState(TaxiState.FREE);
         }
+    }
+
+    public void startRideElection(Taxi taxi, RideRequest request) {
+        synchronized (electionThreadLock) {
+            electionThread = new HandleElection(taxi, request);
+        }
+        electionThread.start();
     }
 
     public void recharge(Point stationPosition) {
@@ -553,8 +580,7 @@ public class Taxi {
                     if (getState() == TaxiState.FREE && !taxi.getRequests().contains(rideRequest) && !taxi.getRequestsHandled().contains(rideRequest)) {
                         setState(TaxiState.HANDLING_RIDE);
 
-                        electionThread = new HandleElection(taxi, rideRequest);
-                        electionThread.start();
+                        startRideElection(taxi, rideRequest);
                     } else {
                         System.out.println("Taxi " + id + " is already driving or charging or in " +
                                 "mutual exclusion for charging or is leaving");
@@ -606,6 +632,7 @@ public class Taxi {
                     if (topic != null) {
                         System.out.println("Taxi " + id + " Unsubscribe from topic: " + topic);
                         mqttClient.unsubscribe(topic);
+                        getRequests().clear();
                     }
                     mqttClient.subscribe(newTopic, 1);
                     this.topic = newTopic;

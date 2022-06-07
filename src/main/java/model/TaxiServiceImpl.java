@@ -1,6 +1,7 @@
 package model;
 
 import io.grpc.stub.StreamObserver;
+import rest.beans.RideRequest;
 import rest.beans.TaxiBean;
 import seta.proto.taxi.Taxi;
 import seta.proto.taxi.TaxiServiceGrpc.TaxiServiceImplBase;
@@ -83,6 +84,18 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
                 sendResponse(false, responseObserver);
             } else {
+                if (taxi.getState() == TaxiState.FREE) {
+                    taxi.startRideElection(taxi, new RideRequest(rideRequest.getId(),
+                            new Point((int) rideRequest.getStartX(),
+                                    (int) rideRequest.getStartY()),
+                            new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())));
+                } else if (taxi.getState() == TaxiState.HANDLING_RIDE && taxi.getRequestId() == requestId) {
+                    if (!taxi.getElectionThread().getTaxiIdList().contains(requestTaxiId)) {
+                        taxi.decrementCounter();
+                        taxi.getElectionThread().addTaxi(requestTaxiId);
+                    }
+                }
+
                 double currentDistance = Utils.getDistance(new Point((int) rideRequest.getStartX(),
                         (int) rideRequest.getStartY()), taxi.getStartPos());
                 double requestDistance = electionRequest.getTaxiDistance();
@@ -109,13 +122,13 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
 
                     if (currentTaxiBattery > requestTaxiBattery) {
                         System.out.println("Taxi " + taxiId + " has better battery (" + currentTaxiBattery +
-                                "%) than Taxi " + requestTaxiId + " (" + requestTaxiBattery + ")"
+                                "%) than Taxi " + requestTaxiId + " (" + requestTaxiBattery + "%)"
                                 + " about request " + requestId);
 
                         waitUntilWinElection(responseObserver, requestId);
                     } else if (currentTaxiBattery < requestTaxiBattery) {
                         System.out.println("Taxi " + taxiId + " has worse battery (" + currentTaxiBattery +
-                                "%) than Taxi " + requestTaxiId + " (" + requestTaxiBattery + ")"
+                                "%) than Taxi " + requestTaxiId + " (" + requestTaxiBattery + "%)"
                                 + " about request " + requestId);
 
                         sendResponse(true, responseObserver);
