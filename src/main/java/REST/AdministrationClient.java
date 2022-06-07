@@ -54,11 +54,11 @@ public class AdministrationClient {
                     default:
                         System.exit(0);
                 }
-            } catch (InputMismatchException ex){
+            } catch (InputMismatchException e){
                 System.out.println("\nInsert a number!");
                 scanner.next();
-            } catch (Exception ex){
-                ex.printStackTrace();
+            } catch (Exception e){
+                e.printStackTrace();
                 scanner.next();
             }
         }

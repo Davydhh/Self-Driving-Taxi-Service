@@ -262,7 +262,6 @@ public class Taxi {
                     System.out.println("loc " + e.getLocalizedMessage());
                     System.out.println("cause " + e.getCause());
                     System.out.println("excep " + e);
-                    e.printStackTrace();
                 }
             }
 
@@ -373,6 +372,19 @@ public class Taxi {
             stateLock.notifyAll();
         }
 
+        try {
+            String payload = new Gson().toJson(request);
+            MqttMessage message = new MqttMessage(payload.getBytes());
+            message.setQos(2);
+            mqttClient.publish("seta/smartcity/rides/handled", message);
+        } catch (MqttException e) {
+            System.out.println("reason " + e.getReasonCode());
+            System.out.println("msg " + e.getMessage());
+            System.out.println("loc " + e.getLocalizedMessage());
+            System.out.println("cause " + e.getCause());
+            System.out.println("excep " + e);
+        }
+
         double distance = Utils.getDistance(startPos, request.getEndPos());
         try {
             Thread.sleep(5000);
@@ -388,20 +400,6 @@ public class Taxi {
         removeRequest(request);
         incrementRides();
         System.out.println("Request " + request.getId() + " completed");
-
-        try {
-            String payload = new Gson().toJson(request);
-            MqttMessage message = new MqttMessage(payload.getBytes());
-            message.setQos(2);
-            mqttClient.publish("seta/smartcity/rides/handled", message);
-        } catch (MqttException e) {
-            System.out.println("reason " + e.getReasonCode());
-            System.out.println("msg " + e.getMessage());
-            System.out.println("loc " + e.getLocalizedMessage());
-            System.out.println("cause " + e.getCause());
-            System.out.println("excep " + e);
-            e.printStackTrace();
-        }
 
         if (battery < 30 && !isLeaving()) {
             System.out.println("\nTaxi " + id + " has battery lower than 30%");
@@ -442,8 +440,8 @@ public class Taxi {
         System.out.println("Taxi " + id + " is charging on station " + rechargeStationId);
         try {
             Thread.sleep(10000);
-        } catch (InterruptedException ex) {
-            ex.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
 
         setRechargeStationId(-1);
@@ -515,23 +513,23 @@ public class Taxi {
 
         try {
             mqttClient = new MqttClient(broker, mqttClientId, null);
-        } catch (MqttException ex) {
-            ex.printStackTrace();
+        } catch (MqttException e) {
+            e.printStackTrace();
             System.out.println("Error in mqtt connection creation, exit");
             System.exit(0);
         }
 
         MqttConnectOptions connOpts = new MqttConnectOptions();
         connOpts.setCleanSession(true);
+        connOpts.setAutomaticReconnect(true);
 
         System.out.println(mqttClientId + " Connecting Broker " + broker);
 
         try {
             mqttClient.connect(connOpts);
-        } catch (MqttException ex) {
-            ex.printStackTrace();
-            System.out.println("Error in mqtt connection, exit");
-            System.exit(0);
+        } catch (MqttException e) {
+            e.printStackTrace();
+            System.out.println("Error in mqtt connection");
         }
 
         System.out.println(mqttClientId + " Connected - Taxi ID: " + id);
@@ -578,8 +576,12 @@ public class Taxi {
         try {
             mqttClient.subscribe("seta/smartcity/rides/removed", 2);
             System.out.println("Subscribed to topic: seta/smartcity/rides/removed");
-        } catch (MqttException ex) {
-            ex.printStackTrace();
+        } catch (MqttException e) {
+            System.out.println("reason " + e.getReasonCode());
+            System.out.println("msg " + e.getMessage());
+            System.out.println("loc " + e.getLocalizedMessage());
+            System.out.println("cause " + e.getCause());
+            System.out.println("excep " + e);
         }
     }
 
@@ -607,10 +609,12 @@ public class Taxi {
                     }
                     mqttClient.subscribe(newTopic, 1);
                     this.topic = newTopic;
-                } catch (MqttException ex) {
-                    ex.printStackTrace();
-                    mqttDisconnect();
-                    System.out.println("Error subscribing to topic " + newTopic + ", exit");
+                } catch (MqttException e) {
+                    e.printStackTrace();
+                    System.out.println("Error subscribing to topic " + newTopic + " or " +
+                            "unsubscribing to topic " + topic);
+                    //In this case it is fine to have the process abruptly terminated as
+                    // subsequent operations do not involve other taxis
                     System.exit(0);
                 }
 
@@ -633,10 +637,9 @@ public class Taxi {
         try {
             mqttClient.disconnect();
             System.out.println("\nMqtt disconnect");
-        } catch (MqttException ex) {
-            ex.printStackTrace();
+        } catch (MqttException e) {
+            e.printStackTrace();
             System.out.println("Error in mqtt disconnection");
-            System.exit(0);
         }
     }
 
@@ -717,7 +720,6 @@ public class Taxi {
             System.out.println("Rpc server finished");
         } catch (InterruptedException e) {
             e.printStackTrace();
-            throw new RuntimeException(e);
         }
 
         ClientResponse response = deleteRequest(serverAddress + "/taxis", id);
@@ -756,8 +758,8 @@ public class Taxi {
         int id = -1;
         try {
             id = scanner.nextInt();
-        } catch (InputMismatchException ex) {
-            ex.printStackTrace();
+        } catch (InputMismatchException e) {
+            e.printStackTrace();
             System.out.println("The id must be a number!");
             System.exit(0);
         }
@@ -766,7 +768,7 @@ public class Taxi {
         int port = -1;
         try {
             port = scanner.nextInt();
-        } catch (InputMismatchException ex) {
+        } catch (InputMismatchException e) {
             System.out.println("The port must be a number!");
             System.exit(0);
         }

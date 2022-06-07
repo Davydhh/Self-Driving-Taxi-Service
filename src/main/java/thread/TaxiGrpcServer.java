@@ -31,8 +31,8 @@ public class TaxiGrpcServer extends Thread {
             System.out.println("Taxi " + taxi.getId() + " server started on port " + taxi.getPort());
 
             server.awaitTermination(10, TimeUnit.SECONDS);
-        } catch (IOException | InterruptedException ex) {
-            ex.printStackTrace();
+        } catch (IOException | InterruptedException e) {
+            e.printStackTrace();
             System.exit(0);}
     }
 

@@ -17,6 +17,7 @@ public class Seta {
             client = new MqttClient(broker, clientId, null);
             MqttConnectOptions connOpts = new MqttConnectOptions();
             connOpts.setCleanSession(true);
+            connOpts.setAutomaticReconnect(true);
 
             System.out.println(clientId + " Connecting Broker " + broker);
             client.connect(connOpts);
@@ -62,7 +63,6 @@ public class Seta {
                                 System.out.println("loc " + e.getLocalizedMessage());
                                 System.out.println("cause " + e.getCause());
                                 System.out.println("excep " + e);
-                                e.printStackTrace();
                             }
                         }
                     } else if (topic.equals("seta/smartcity/rides/handled")) {
@@ -85,7 +85,6 @@ public class Seta {
                                     System.out.println("loc " + e.getLocalizedMessage());
                                     System.out.println("cause " + e.getCause());
                                     System.out.println("excep " + e);
-                                    e.printStackTrace();
                                 }
                             }
                         }
@@ -104,13 +103,12 @@ public class Seta {
             client.subscribe(subTopics, subQos);
 
             new RideRequestGenerator(client, requests).start();
-        } catch (MqttException me ) {
-            System.out.println("reason " + me.getReasonCode());
-            System.out.println("msg " + me.getMessage());
-            System.out.println("loc " + me.getLocalizedMessage());
-            System.out.println("cause " + me.getCause());
-            System.out.println("excep " + me);
-            me.printStackTrace();
+        } catch (MqttException e) {
+            System.out.println("reason " + e.getReasonCode());
+            System.out.println("msg " + e.getMessage());
+            System.out.println("loc " + e.getLocalizedMessage());
+            System.out.println("cause " + e.getCause());
+            System.out.println("excep " + e);
         }
     }
 }

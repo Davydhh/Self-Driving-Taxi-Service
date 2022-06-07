@@ -35,8 +35,8 @@ public class TaxisService {
 
         try {
             id = Integer.parseInt(taxi);
-        } catch (NumberFormatException ex) {
-            ex.printStackTrace();
+        } catch (NumberFormatException e) {
+            e.printStackTrace();
             return Response.status(Response.Status.BAD_REQUEST).build();
         }
 

@@ -35,7 +35,6 @@ public class RideRequestGenerator extends Thread {
                 Thread.sleep(5000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
-                throw new RuntimeException(e);
             }
         }
     }
@@ -70,7 +69,6 @@ public class RideRequestGenerator extends Thread {
             System.out.println("loc " + e.getLocalizedMessage());
             System.out.println("cause " + e.getCause());
             System.out.println("excep " + e);
-            e.printStackTrace();
         }
         System.out.println("Message published to topic " + pubTopic);
     }
