@@ -786,7 +786,6 @@ public class Taxi {
         try {
             id = scanner.nextInt();
         } catch (InputMismatchException e) {
-            e.printStackTrace();
             System.out.println("The id must be a number!");
             System.exit(0);
         }
