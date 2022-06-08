@@ -59,29 +59,29 @@ public class RideRequestGenerator extends Thread {
 
         System.out.println("Publishing message: " + payload);
 
-        int errors = 0;
         requests.computeIfAbsent(pubTopic, r -> new LinkedList<>()).offer(request);
-        sendRequest(pubTopic, message, errors);
+        sendRequest(pubTopic, message);
         System.out.println("Message published to topic " + pubTopic);
     }
 
-    private void sendRequest(String pubTopic, MqttMessage message, int errors) {
-        try {
-            client.publish(pubTopic, message);
-            System.out.println("Seta requests: " + requests);
-        } catch (MqttException e) {
-            System.out.println("reason " + e.getReasonCode());
-            System.out.println("msg " + e.getMessage());
-            System.out.println("loc " + e.getLocalizedMessage());
-            System.out.println("cause " + e.getCause());
-            System.out.println("excep " + e);
+    private void sendRequest(String pubTopic, MqttMessage message) {
+        int errors = 0;
 
-            while (errors < 4) {
-                errors += 1;
-                sendRequest(pubTopic, message, errors);
+        while(true) {
+            try {
+                client.publish(pubTopic, message);
+                break;
+            } catch (MqttException e) {
+                System.out.println("reason " + e.getReasonCode());
+                System.out.println("msg " + e.getMessage());
+                System.out.println("loc " + e.getLocalizedMessage());
+                System.out.println("cause " + e.getCause());
+                System.out.println("excep " + e);
+
+                if (++errors == 5) {
+                    System.exit(0);
+                }
             }
-
-            System.exit(0);
         }
     }
 }

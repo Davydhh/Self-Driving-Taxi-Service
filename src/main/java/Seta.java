@@ -32,7 +32,7 @@ public class Seta {
                     }
                     i += 1;
 
-                    if (i == 10) {
+                    if (i == 20) {
                         System.exit(0);
                     }
                 }
@@ -70,15 +70,23 @@ public class Seta {
                         if (r != null) {
                             String payload = new Gson().toJson(r);
                             MqttMessage pubMessage = new MqttMessage(payload.getBytes());
-                            try {
-                                client.publish(receivedMessage, pubMessage);
-                                System.out.println("Resend request " + r.getId());
-                            } catch (MqttException e) {
-                                System.out.println("reason " + e.getReasonCode());
-                                System.out.println("msg " + e.getMessage());
-                                System.out.println("loc " + e.getLocalizedMessage());
-                                System.out.println("cause " + e.getCause());
-                                System.out.println("excep " + e);
+                            int errors = 0;
+                            while(true) {
+                                try {
+                                    client.publish(receivedMessage, pubMessage);
+                                    System.out.println("Resend request " + r.getId());
+                                    break;
+                                } catch (MqttException e) {
+                                    System.out.println("reason " + e.getReasonCode());
+                                    System.out.println("msg " + e.getMessage());
+                                    System.out.println("loc " + e.getLocalizedMessage());
+                                    System.out.println("cause " + e.getCause());
+                                    System.out.println("excep " + e);
+
+                                    if (++errors == 5) {
+                                        System.exit(0);
+                                    }
+                                }
                             }
                         }
                     } else if (topic.equals("seta/smartcity/rides/handled")) {
@@ -93,14 +101,22 @@ public class Seta {
                                 System.out.println("\nRequest " + rideRequest.getId() + " removed");
                                 System.out.println("Seta requests: " + requests);
 
-                                try {
-                                    client.publish("seta/smartcity/rides/removed", message);
-                                } catch (MqttException e) {
-                                    System.out.println("reason " + e.getReasonCode());
-                                    System.out.println("msg " + e.getMessage());
-                                    System.out.println("loc " + e.getLocalizedMessage());
-                                    System.out.println("cause " + e.getCause());
-                                    System.out.println("excep " + e);
+                                int errors = 0;
+                                while(true) {
+                                    try {
+                                        client.publish("seta/smartcity/rides/removed", message);
+                                        break;
+                                    } catch (MqttException e) {
+                                        System.out.println("reason " + e.getReasonCode());
+                                        System.out.println("msg " + e.getMessage());
+                                        System.out.println("loc " + e.getLocalizedMessage());
+                                        System.out.println("cause " + e.getCause());
+                                        System.out.println("excep " + e);
+
+                                        if (++errors == 5) {
+                                            System.exit(0);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -116,7 +132,23 @@ public class Seta {
             String[] subTopics = new String[] {"seta/smartcity/taxis/free", "seta/smartcity/rides/handled"};
             int[] subQos = new int[] {2, 2};
 
-            client.subscribe(subTopics, subQos);
+            int errors = 0;
+            while(true) {
+                try {
+                    client.subscribe(subTopics, subQos);
+                    break;
+                } catch (MqttException e) {
+                    System.out.println("reason " + e.getReasonCode());
+                    System.out.println("msg " + e.getMessage());
+                    System.out.println("loc " + e.getLocalizedMessage());
+                    System.out.println("cause " + e.getCause());
+                    System.out.println("excep " + e);
+
+                    if (++errors == 5) {
+                        System.exit(0);
+                    }
+                }
+            }
 
             new RideRequestGenerator(client, requests).start();
         } catch (MqttException e) {
