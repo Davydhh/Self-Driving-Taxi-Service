@@ -680,30 +680,18 @@ public class Taxi {
         for (TaxiBean t: getOtherTaxis()) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
+            TaxiServiceGrpc.TaxiServiceBlockingStub stub = TaxiServiceGrpc.newBlockingStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
                     seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
-            stub.addTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.AddTaxiResponseMessage>() {
-                @Override
-                public void onNext(seta.proto.taxi.Taxi.AddTaxiResponseMessage value) {
-                    if (value.getAdded()) {
-                        System.out.println("Taxi " + t.getId() + " correctly updated");
-                    } else {
-                        System.out.println("Taxi " + t.getId() + " have been not correctly " +
-                                "updated");
-                    }
-                }
 
-                @Override
-                public void onError(Throwable t) {
-                    t.printStackTrace();
-                }
+            seta.proto.taxi.Taxi.AddTaxiResponseMessage response = stub.addTaxi(message);
 
-                @Override
-                public void onCompleted() {
-                    channel.shutdownNow();
-                }
-            });
+            if (response.getAdded()) {
+                System.out.println("Taxi " + t.getId() + " correctly updated for joining");
+            } else {
+                System.out.println("Taxi " + t.getId() + " have been not correctly " +
+                        "updated for joining");
+            }
         }
     }
 
@@ -717,10 +705,10 @@ public class Taxi {
             seta.proto.taxi.Taxi.RemoveTaxiResponseMessage response = stub.removeTaxi(message);
 
             if (response.getRemoved()) {
-                System.out.println("Taxi " + t.getId() + " correctly updated");
+                System.out.println("Taxi " + t.getId() + " correctly updated for leaving");
             } else {
                 System.out.println("Taxi " + t.getId() + " have been not correctly " +
-                        "updated");
+                        "updated for leaving");
             }
         }
     }
