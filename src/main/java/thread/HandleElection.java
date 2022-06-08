@@ -118,9 +118,6 @@ public class HandleElection extends Thread {
 
                         @Override
                         public void onError(Throwable t) {
-                            System.out.println("Taxi " + taxi.getId() + " received ok from a Taxi" +
-                                    " that has leaved about request " + request.getId());
-
                             synchronized (taxi.getOkCounterLock()) {
                                 taxi.incrementCounter();
 
@@ -221,9 +218,6 @@ public class HandleElection extends Thread {
 
                 @Override
                 public void onError(Throwable t) {
-                    System.out.println("Taxi " + taxi.getId() + " received ok from a Taxi" +
-                            " that has leaved about request " + request.getId());
-
                     synchronized (taxi.getOkCounterLock()) {
                         taxi.incrementCounter();
 

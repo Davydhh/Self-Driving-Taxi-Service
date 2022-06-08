@@ -7,6 +7,36 @@ import util.Utils;
 import java.util.*;
 
 public class Seta {
+    private static void mqttConnect(MqttClient client) {
+        MqttConnectOptions connOpts = new MqttConnectOptions();
+        connOpts.setCleanSession(false);
+
+        int errors = 0;
+        while(true) {
+            try {
+                client.connect(connOpts);
+                System.out.println("Seta connected");
+                break;
+            } catch (MqttException e) {
+                System.out.println("reason " + e.getReasonCode());
+                System.out.println("msg " + e.getMessage());
+                System.out.println("loc " + e.getLocalizedMessage());
+                System.out.println("cause " + e.getCause());
+                System.out.println("excep " + e);
+
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e2) {
+                    e2.printStackTrace();
+                }
+
+                if (++errors == 5) {
+                    System.exit(0);
+                }
+            }
+        }
+    }
+
     public static void main(String[] args) {
         System.out.println("SETA system started");
         MqttClient client;
@@ -15,29 +45,9 @@ public class Seta {
 
         try {
             client = new MqttClient(broker, clientId, null);
-            MqttConnectOptions connOpts = new MqttConnectOptions();
-            connOpts.setCleanSession(true);
-            connOpts.setAutomaticReconnect(true);
 
             System.out.println(clientId + " Connecting Broker " + broker);
-            try {
-                client.connect(connOpts);
-            } catch (MqttException e) {
-                int i = 0;
-                while (!client.isConnected()) {
-                    try {
-                        Thread.sleep(30000);
-                    } catch (InterruptedException e2) {
-                        e2.printStackTrace();
-                    }
-                    i += 1;
-
-                    if (i == 20) {
-                        System.exit(0);
-                    }
-                }
-            }
-            System.out.println(clientId + " Connected");
+            mqttConnect(client);
 
             Map<String, Queue<RideRequest>> requests = new HashMap<>();
 
@@ -46,6 +56,7 @@ public class Seta {
                 public void connectionLost(Throwable cause) {
                     System.out.println("Seta Connection lost!");
                     cause.printStackTrace();
+                    mqttConnect(client);
                 }
 
                 @Override
@@ -84,18 +95,8 @@ public class Seta {
                                     System.out.println("cause " + e.getCause());
                                     System.out.println("excep " + e);
 
-                                    int i = 0;
-                                    while (!client.isConnected()) {
-                                        try {
-                                            Thread.sleep(10000);
-                                        } catch (InterruptedException e2) {
-                                            e2.printStackTrace();
-                                        }
-                                        i += 1;
-
-                                        if (i == 10) {
-                                            System.exit(0);
-                                        }
+                                    if (!client.isConnected()) {
+                                        mqttConnect(client);
                                     }
 
                                     if (++errors == 5) {
@@ -128,18 +129,8 @@ public class Seta {
                                         System.out.println("cause " + e.getCause());
                                         System.out.println("excep " + e);
 
-                                        int i = 0;
-                                        while (!client.isConnected()) {
-                                            try {
-                                                Thread.sleep(10000);
-                                            } catch (InterruptedException e2) {
-                                                e2.printStackTrace();
-                                            }
-                                            i += 1;
-
-                                            if (i == 10) {
-                                                System.exit(0);
-                                            }
+                                        if (!client.isConnected()) {
+                                            mqttConnect(client);
                                         }
 
                                         if (++errors == 5) {
@@ -173,18 +164,8 @@ public class Seta {
                     System.out.println("cause " + e.getCause());
                     System.out.println("excep " + e);
 
-                    int i = 0;
-                    while (!client.isConnected()) {
-                        try {
-                            Thread.sleep(10000);
-                        } catch (InterruptedException e2) {
-                            e2.printStackTrace();
-                        }
-                        i += 1;
-
-                        if (i == 10) {
-                            System.exit(0);
-                        }
+                    if (!client.isConnected()) {
+                        mqttConnect(client);
                     }
 
                     if (++errors == 5) {

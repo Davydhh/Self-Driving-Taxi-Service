@@ -2,6 +2,7 @@ package thread;
 
 import com.google.gson.Gson;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import rest.beans.RideRequest;
@@ -78,18 +79,38 @@ public class RideRequestGenerator extends Thread {
                 System.out.println("cause " + e.getCause());
                 System.out.println("excep " + e);
 
-                int i = 0;
-                while (!client.isConnected()) {
-                    try {
-                        Thread.sleep(10000);
-                    } catch (InterruptedException e2) {
-                        e2.printStackTrace();
-                    }
-                    i += 1;
+                if (!client.isConnected()) {
+                    mqttConnect();
+                }
 
-                    if (i == 10) {
-                        System.exit(0);
-                    }
+                if (++errors == 5) {
+                    System.exit(0);
+                }
+            }
+        }
+    }
+
+    private void mqttConnect() {
+        MqttConnectOptions connOpts = new MqttConnectOptions();
+        connOpts.setCleanSession(false);
+
+        int errors = 0;
+        while(true) {
+            try {
+                client.connect(connOpts);
+                System.out.println("Seta connected");
+                break;
+            } catch (MqttException e) {
+                System.out.println("reason " + e.getReasonCode());
+                System.out.println("msg " + e.getMessage());
+                System.out.println("loc " + e.getLocalizedMessage());
+                System.out.println("cause " + e.getCause());
+                System.out.println("excep " + e);
+
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e2) {
+                    e2.printStackTrace();
                 }
 
                 if (++errors == 5) {

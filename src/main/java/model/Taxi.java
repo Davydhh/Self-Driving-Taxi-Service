@@ -118,6 +118,7 @@ public class Taxi {
         this.rides = 0;
         this.km = 0;
         this.requestsHandled = new ArrayList<>();
+        this.otherTaxis = new ArrayList<>();
         this.leaving = false;
         this.requests = new LinkedList<>();
         this.buffer = new TaxiBuffer();
@@ -276,14 +277,28 @@ public class Taxi {
             if (!isLeaving()) {
                 MqttMessage message = new MqttMessage(getTopic().getBytes());
                 message.setQos(2);
-                try {
-                    mqttClient.publish("seta/smartcity/taxis/free", message);
-                } catch (MqttException e) {
-                    System.out.println("reason " + e.getReasonCode());
-                    System.out.println("msg " + e.getMessage());
-                    System.out.println("loc " + e.getLocalizedMessage());
-                    System.out.println("cause " + e.getCause());
-                    System.out.println("excep " + e);
+                int errors = 0;
+                while(true) {
+                    try {
+                        mqttClient.publish("seta/smartcity/taxis/free", message);
+                        break;
+                    } catch (MqttException e) {
+                        System.out.println("reason " + e.getReasonCode());
+                        System.out.println("msg " + e.getMessage());
+                        System.out.println("loc " + e.getLocalizedMessage());
+                        System.out.println("cause " + e.getCause());
+                        System.out.println("excep " + e);
+
+                        if (!mqttClient.isConnected()) {
+                            mqttConnect();
+                        }
+
+                        if (++errors == 5) {
+                            setLeaving(true);
+                            leave();
+                            System.exit(0);
+                        }
+                    }
                 }
             }
 
@@ -390,17 +405,29 @@ public class Taxi {
             stateLock.notifyAll();
         }
 
-        try {
-            String payload = new Gson().toJson(request);
-            MqttMessage message = new MqttMessage(payload.getBytes());
-            message.setQos(2);
-            mqttClient.publish("seta/smartcity/rides/handled", message);
-        } catch (MqttException e) {
-            System.out.println("reason " + e.getReasonCode());
-            System.out.println("msg " + e.getMessage());
-            System.out.println("loc " + e.getLocalizedMessage());
-            System.out.println("cause " + e.getCause());
-            System.out.println("excep " + e);
+        int errors = 0;
+        while(true) {
+            try {
+                String payload = new Gson().toJson(request);
+                MqttMessage message = new MqttMessage(payload.getBytes());
+                message.setQos(2);
+                mqttClient.publish("seta/smartcity/rides/handled", message);
+                break;
+            } catch (MqttException e) {
+                System.out.println("reason " + e.getReasonCode());
+                System.out.println("msg " + e.getMessage());
+                System.out.println("loc " + e.getLocalizedMessage());
+                System.out.println("cause " + e.getCause());
+                System.out.println("excep " + e);
+
+                if (!mqttClient.isConnected()) {
+                    mqttConnect();
+                }
+
+                if (++errors == 5) {
+                    setLeaving(true);
+                }
+            }
         }
 
         double distance = Utils.getDistance(startPos, request.getEndPos());
@@ -495,7 +522,7 @@ public class Taxi {
                     RegistrationResponse.class);
             System.out.println(responseBody.toString());
             startPos = responseBody.getStarPos();
-            otherTaxis = responseBody.getTaxis();
+            otherTaxis.addAll(responseBody.getTaxis());
         } else {
             System.out.println("\nRegistration unsuccessful");
             System.exit(0);
@@ -513,11 +540,26 @@ public class Taxi {
     private ClientResponse sendAddTaxiPost(String url, TaxiBean taxiBean) {
         WebResource webResource = restClient.resource(url);
         String input = new Gson().toJson(taxiBean);
-        try {
-            return webResource.type("application/json").post(ClientResponse.class, input);
-        } catch (ClientHandlerException e) {
-            System.out.println("Server non disponibile");
-            return null;
+
+        int errors = 0;
+        while(true) {
+            try {
+                return webResource.type("application/json").post(ClientResponse.class, input);
+            } catch (ClientHandlerException e) {
+                System.out.println("Server non disponibile");
+
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e2) {
+                    e2.printStackTrace();
+                }
+
+                if (++errors == 5) {
+                    setLeaving(true);
+                    leave();
+                    System.exit(0);
+                }
+            }
         }
     }
 
@@ -540,23 +582,12 @@ public class Taxi {
         } catch (MqttException e) {
             e.printStackTrace();
             System.out.println("Error in mqtt connection creation, exit");
+            setLeaving(true);
+            taxi.leave();
             System.exit(0);
         }
 
-        MqttConnectOptions connOpts = new MqttConnectOptions();
-        connOpts.setCleanSession(true);
-        connOpts.setAutomaticReconnect(true);
-
-        System.out.println(mqttClientId + " Connecting Broker " + broker);
-
-        try {
-            mqttClient.connect(connOpts);
-        } catch (MqttException e) {
-            e.printStackTrace();
-            System.out.println("Error in mqtt connection");
-        }
-
-        System.out.println(mqttClientId + " Connected - Taxi ID: " + id);
+        mqttConnect();
 
         mqttClient.setCallback(new MqttCallback() {
 
@@ -588,6 +619,7 @@ public class Taxi {
 
             public void connectionLost(Throwable cause) {
                 System.out.println("Taxi " + id + " has lost the mqtt connection! cause:" + cause.getMessage());
+                mqttConnect();
             }
 
             public void deliveryComplete(IMqttDeliveryToken token) {
@@ -595,15 +627,66 @@ public class Taxi {
             }
         });
 
-        try {
-            mqttClient.subscribe("seta/smartcity/rides/removed", 2);
-            System.out.println("Subscribed to topic: seta/smartcity/rides/removed");
-        } catch (MqttException e) {
-            System.out.println("reason " + e.getReasonCode());
-            System.out.println("msg " + e.getMessage());
-            System.out.println("loc " + e.getLocalizedMessage());
-            System.out.println("cause " + e.getCause());
-            System.out.println("excep " + e);
+        int errors = 0;
+
+        while(true) {
+            try {
+                mqttClient.subscribe("seta/smartcity/rides/removed", 2);
+                System.out.println("Subscribed to topic: seta/smartcity/rides/removed");
+                break;
+            } catch (MqttException e) {
+                System.out.println("reason " + e.getReasonCode());
+                System.out.println("msg " + e.getMessage());
+                System.out.println("loc " + e.getLocalizedMessage());
+                System.out.println("cause " + e.getCause());
+                System.out.println("excep " + e);
+
+                if (!mqttClient.isConnected()) {
+                    mqttConnect();
+                }
+
+                if (++errors == 5) {
+                    setLeaving(true);
+                    leave();
+                    System.exit(0);
+                }
+            }
+        }
+    }
+
+    private void mqttConnect() {
+        System.out.println("Taxi Connecting Broker");
+
+        MqttConnectOptions connOpts = new MqttConnectOptions();
+        connOpts.setCleanSession(false);
+
+        int errors = 0;
+        boolean condition = true;
+        while(condition) {
+            try {
+                mqttClient.connect(connOpts);
+                System.out.println("Taxi Connected to MQTT Broker");
+                break;
+            } catch (MqttException e) {
+                System.out.println("reason " + e.getReasonCode());
+                System.out.println("msg " + e.getMessage());
+                System.out.println("loc " + e.getLocalizedMessage());
+                System.out.println("cause " + e.getCause());
+                System.out.println("excep " + e);
+
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException e2) {
+                    e2.printStackTrace();
+                }
+
+                if (++errors == 5) {
+                    condition = false;
+                    setLeaving(true);
+                    leave();
+                    System.exit(0);
+                }
+            }
         }
     }
 
@@ -624,24 +707,60 @@ public class Taxi {
 
         synchronized (topicLock) {
             if (!newTopic.equals(this.topic)) {
-                try {
-                    if (topic != null) {
-                        System.out.println("Taxi " + id + " Unsubscribe from topic: " + topic);
-                        mqttClient.unsubscribe(topic);
-                        getRequests().clear();
+
+                if (topic != null) {
+                    int unsubErrors = 0;
+                    while(true) {
+                        try {
+                            System.out.println("Taxi " + id + " Unsubscribe from topic: " + topic);
+                            mqttClient.unsubscribe(topic);
+                            getRequests().clear();
+                            break;
+                        } catch (MqttException e) {
+                            System.out.println("reason " + e.getReasonCode());
+                            System.out.println("msg " + e.getMessage());
+                            System.out.println("loc " + e.getLocalizedMessage());
+                            System.out.println("cause " + e.getCause());
+                            System.out.println("excep " + e);
+
+                            if (!mqttClient.isConnected()) {
+                                mqttConnect();
+                            }
+
+                            if (++unsubErrors == 5) {
+                                setLeaving(true);
+                                leave();
+                                System.exit(0);
+                            }
+                        }
                     }
-                    mqttClient.subscribe(newTopic, 1);
-                    this.topic = newTopic;
-                } catch (MqttException e) {
-                    e.printStackTrace();
-                    System.out.println("Error subscribing to topic " + newTopic + " or " +
-                            "unsubscribing to topic " + topic);
-                    //In this case it is fine to have the process abruptly terminated as
-                    // subsequent operations do not involve other taxis
-                    System.exit(0);
                 }
 
-                System.out.println("Taxi " + id + " Subscribed to topic : " + newTopic);
+                int subErrors = 0;
+                while(true) {
+                    try {
+                        mqttClient.subscribe(newTopic, 1);
+                        System.out.println("Taxi " + id + " Subscribed to topic : " + newTopic);
+                        this.topic = newTopic;
+                        break;
+                    } catch (MqttException e) {
+                        System.out.println("reason " + e.getReasonCode());
+                        System.out.println("msg " + e.getMessage());
+                        System.out.println("loc " + e.getLocalizedMessage());
+                        System.out.println("cause " + e.getCause());
+                        System.out.println("excep " + e);
+
+                        if (!mqttClient.isConnected()) {
+                            mqttConnect();
+                        }
+
+                        if (++subErrors == 5) {
+                            setLeaving(true);
+                            leave();
+                            System.exit(0);
+                        }
+                    }
+                }
             }
         }
     }
@@ -658,11 +777,14 @@ public class Taxi {
 
     public void mqttDisconnect() {
         try {
-            mqttClient.disconnect();
-            System.out.println("\nMqtt disconnect");
+            if (mqttClient != null) {
+                mqttClient.disconnect();
+                System.out.println("\nMqtt disconnect");
+            }
         } catch (MqttException e) {
-            e.printStackTrace();
             System.out.println("Error in mqtt disconnection");
+            System.out.println("Message: " + e.getMessage());
+            System.out.println("Cause: " + e.getCause());
         }
     }
 
@@ -763,23 +885,34 @@ public class Taxi {
         mqttDisconnect();
         notifyOtherTaxisForLeaving();
 
-        rpcThread.stopMeGently();
-        pm10Simulator.stopMeGently();
-        statisticsThread.stopMeGently();
+        try {
+            if (rpcThread != null) {
+                rpcThread.stopMeGently();
+                System.out.println("Wait until rpc thread finish");
+                rpcThread.join();
+                System.out.println("Rpc server finished");
+            }
+
+            if (pm10Simulator != null) {
+                pm10Simulator.stopMeGently();
+                System.out.println("Wait until simulator thread finish");
+                pm10Simulator.join();
+                System.out.println("Simulator finished");
+            }
+
+            if (statisticsThread != null) {
+                statisticsThread.stopMeGently();
+                System.out.println("Wait until statistics thread finish");
+                statisticsThread.join();
+                System.out.println("Computing statistics finished");
+            }
+
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
 
         synchronized (statisticsLock) {
             statisticsLock.notify();
-        }
-
-        try {
-            pm10Simulator.join();
-            System.out.println("Simulator finished");
-            statisticsThread.join();
-            System.out.println("Computing statistics finished");
-            rpcThread.join();
-            System.out.println("Rpc server finished");
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         }
 
         ClientResponse response = deleteRequest(serverAddress + "/taxis", id);
@@ -806,7 +939,7 @@ public class Taxi {
         if (response != null && response.getStatus() == 200) {
             System.out.println("\nStatistics sent successfully");
         } else {
-            System.out.println("\nStatistics sent unsuccessfully");
+            System.out.println("\nStatistics not sent");
         }
     }
 
@@ -889,7 +1022,7 @@ public class Taxi {
 
         if (taxi.getState() == TaxiState.FREE) {
             taxi.leave();
-        } else  {
+        } else {
             while (taxi.getState() != TaxiState.FREE && taxi.getState() != TaxiState.LEAVING) {
                 if (taxi.getState() == TaxiState.HANDLING_RIDE) {
                     synchronized (taxi.getOkCounterLock()) {
