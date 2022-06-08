@@ -819,6 +819,9 @@ public class Taxi {
                 @Override
                 public void onError(Throwable t) {
                     t.printStackTrace();
+                    setLeaving(true);
+                    leave();
+                    System.exit(0);
                 }
 
                 @Override
