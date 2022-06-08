@@ -93,10 +93,6 @@ public class HandleElection extends Thread {
                                 System.out.println("Taxi " + taxi.getId() + " did not receive ok from " +
                                         "Taxi " + t.getId() + " about request " + request.getId());
                                 taxi.removeRequest(request);
-                                if (taxi.getState() == HANDLING_RIDE && taxi.getRequestId() == request.getId()) {
-                                    taxi.setRequestId(-1);
-                                    taxi.handlePendingRequests();
-                                }
 
                                 synchronized (taxi.getOkCounterLock()) {
                                     taxi.getOkCounterLock().notifyAll();
@@ -159,6 +155,9 @@ public class HandleElection extends Thread {
 
                 taxi.setState(TaxiState.FREE);
             }
+        } else if (!taxi.isLeaving() && taxi.getState() == HANDLING_RIDE && taxi.getRequestId() == request.getId()) {
+            taxi.setRequestId(-1);
+            taxi.handlePendingRequests();
         }
     }
 
