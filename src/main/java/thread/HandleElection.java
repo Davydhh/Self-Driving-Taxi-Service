@@ -143,7 +143,7 @@ public class HandleElection extends Thread {
         System.out.println("\nTaxi " + taxi.getId() + " wait for receiving ok for ride request " + request.getId());
 
         try {
-            taxi.getOkCounterLock().wait();
+            taxi.getOkCounterLock().wait(60000);
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
