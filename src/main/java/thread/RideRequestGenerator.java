@@ -59,8 +59,14 @@ public class RideRequestGenerator extends Thread {
 
         System.out.println("Publishing message: " + payload);
 
+        int errors = 0;
+        requests.computeIfAbsent(pubTopic, r -> new LinkedList<>()).offer(request);
+        sendRequest(pubTopic, message, errors);
+        System.out.println("Message published to topic " + pubTopic);
+    }
+
+    private void sendRequest(String pubTopic, MqttMessage message, int errors) {
         try {
-            requests.computeIfAbsent(pubTopic, r -> new LinkedList<>()).offer(request);
             client.publish(pubTopic, message);
             System.out.println("Seta requests: " + requests);
         } catch (MqttException e) {
@@ -69,7 +75,13 @@ public class RideRequestGenerator extends Thread {
             System.out.println("loc " + e.getLocalizedMessage());
             System.out.println("cause " + e.getCause());
             System.out.println("excep " + e);
+
+            while (errors < 4) {
+                errors += 1;
+                sendRequest(pubTopic, message, errors);
+            }
+
+            System.exit(0);
         }
-        System.out.println("Message published to topic " + pubTopic);
     }
 }

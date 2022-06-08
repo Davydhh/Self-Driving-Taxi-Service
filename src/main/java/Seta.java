@@ -20,7 +20,23 @@ public class Seta {
             connOpts.setAutomaticReconnect(true);
 
             System.out.println(clientId + " Connecting Broker " + broker);
-            client.connect(connOpts);
+            try {
+                client.connect(connOpts);
+            } catch (MqttException e) {
+                int i = 0;
+                while (!client.isConnected()) {
+                    try {
+                        Thread.sleep(30000);
+                    } catch (InterruptedException e2) {
+                        e2.printStackTrace();
+                    }
+                    i += 1;
+
+                    if (i == 10) {
+                        System.exit(0);
+                    }
+                }
+            }
             System.out.println(clientId + " Connected");
 
             Map<String, Queue<RideRequest>> requests = new HashMap<>();
@@ -109,6 +125,8 @@ public class Seta {
             System.out.println("loc " + e.getLocalizedMessage());
             System.out.println("cause " + e.getCause());
             System.out.println("excep " + e);
+
+            System.exit(0);
         }
     }
 }
