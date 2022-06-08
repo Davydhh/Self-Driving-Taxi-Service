@@ -159,6 +159,15 @@ public class HandleElection extends Thread {
             taxi.setRequestId(-1);
             taxi.handlePendingRequests();
         }
+
+        // Shutdown remaining channels since election is finished
+        if (!channels.isEmpty()) {
+            channels.forEach(c -> {
+                if (!c.isShutdown()) {
+                    c.shutdownNow();
+                }
+            });
+        }
     }
 
     public void addTaxi(int addTaxiId) {
