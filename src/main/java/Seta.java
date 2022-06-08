@@ -70,6 +70,7 @@ public class Seta {
                         if (r != null) {
                             String payload = new Gson().toJson(r);
                             MqttMessage pubMessage = new MqttMessage(payload.getBytes());
+
                             int errors = 0;
                             while(true) {
                                 try {
@@ -82,6 +83,20 @@ public class Seta {
                                     System.out.println("loc " + e.getLocalizedMessage());
                                     System.out.println("cause " + e.getCause());
                                     System.out.println("excep " + e);
+
+                                    int i = 0;
+                                    while (!client.isConnected()) {
+                                        try {
+                                            Thread.sleep(10000);
+                                        } catch (InterruptedException e2) {
+                                            e2.printStackTrace();
+                                        }
+                                        i += 1;
+
+                                        if (i == 10) {
+                                            System.exit(0);
+                                        }
+                                    }
 
                                     if (++errors == 5) {
                                         System.exit(0);
@@ -113,6 +128,20 @@ public class Seta {
                                         System.out.println("cause " + e.getCause());
                                         System.out.println("excep " + e);
 
+                                        int i = 0;
+                                        while (!client.isConnected()) {
+                                            try {
+                                                Thread.sleep(10000);
+                                            } catch (InterruptedException e2) {
+                                                e2.printStackTrace();
+                                            }
+                                            i += 1;
+
+                                            if (i == 10) {
+                                                System.exit(0);
+                                            }
+                                        }
+
                                         if (++errors == 5) {
                                             System.exit(0);
                                         }
@@ -143,6 +172,20 @@ public class Seta {
                     System.out.println("loc " + e.getLocalizedMessage());
                     System.out.println("cause " + e.getCause());
                     System.out.println("excep " + e);
+
+                    int i = 0;
+                    while (!client.isConnected()) {
+                        try {
+                            Thread.sleep(10000);
+                        } catch (InterruptedException e2) {
+                            e2.printStackTrace();
+                        }
+                        i += 1;
+
+                        if (i == 10) {
+                            System.exit(0);
+                        }
+                    }
 
                     if (++errors == 5) {
                         System.exit(0);
