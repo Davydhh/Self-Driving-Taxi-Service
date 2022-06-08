@@ -33,10 +33,17 @@ public class TaxiGrpcServer extends Thread {
             server.awaitTermination(10, TimeUnit.SECONDS);
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
-            System.exit(0);}
+            System.exit(0);
+        }
     }
 
     public void stopMeGently() {
-        server.shutdownNow();
+        try {
+            server.awaitTermination(10, TimeUnit.SECONDS);
+            server.shutdownNow();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            System.exit(0);
+        }
     }
 }

@@ -452,7 +452,7 @@ public class Taxi {
 
     public void startRideElection(Taxi taxi, RideRequest request) {
         synchronized (electionThreadLock) {
-            electionThread = new HandleElection(taxi, request);
+            setElectionThread(new HandleElection(taxi, request));
         }
         electionThread.start();
     }
@@ -860,7 +860,7 @@ public class Taxi {
             while (taxi.getState() != TaxiState.FREE && taxi.getState() != TaxiState.LEAVING) {
                 if (taxi.getState() == TaxiState.HANDLING_RIDE) {
                     synchronized (taxi.getOkCounterLock()) {
-                        taxi.getOkCounterLock().notifyAll();
+                        taxi.getOkCounterLock().notify();
                     }
                 }
 

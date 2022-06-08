@@ -83,6 +83,13 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                 System.out.println("Taxi " + taxiId + " is already driving for request " + taxi.getRequestId());
 
                 sendResponse(false, responseObserver);
+            } else if (taxi.getRequestsHandled().contains(new RideRequest(rideRequest.getId(),
+                    new Point((int) rideRequest.getStartX(),
+                            (int) rideRequest.getStartY()),
+                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())))) {
+                System.out.println("Request " + requestId + " already handled");
+
+                sendResponse(false, responseObserver);
             } else {
                 if (taxi.getState() == TaxiState.FREE) {
                     taxi.startRideElection(taxi, new RideRequest(rideRequest.getId(),
@@ -172,7 +179,7 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                 e.printStackTrace();
             }
 
-            if (taxi.getState() == TaxiState.BUSY) {
+            if (taxi.getState() == TaxiState.BUSY && taxi.getRequestId() == requestId) {
                 sendResponse(taxi.isLeaving(), responseObserver);
             }
         }

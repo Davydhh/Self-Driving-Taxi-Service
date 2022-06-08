@@ -65,7 +65,7 @@ public class HandleCharging extends Thread {
                                     okCounter += 1;
 
                                     if (okCounter == size) {
-                                        counterLock.notifyAll();
+                                        counterLock.notify();
                                     }
                                 }
                             }
@@ -77,7 +77,7 @@ public class HandleCharging extends Thread {
                                 okCounter += 1;
 
                                 if (okCounter == taxiList.size()) {
-                                    counterLock.notifyAll();
+                                    counterLock.notify();
                                 }
                             }
                         }

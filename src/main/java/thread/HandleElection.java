@@ -87,7 +87,7 @@ public class HandleElection extends Thread {
                                 }
 
                                 synchronized (taxi.getOkCounterLock()) {
-                                    taxi.getOkCounterLock().notifyAll();
+                                    taxi.getOkCounterLock().notify();
                                 }
                             } else {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
@@ -98,7 +98,7 @@ public class HandleElection extends Thread {
 
                                     if (taxi.getOkCounter() == size) {
                                         System.out.println("Received all ack!");
-                                        taxi.getOkCounterLock().notifyAll();
+                                        taxi.getOkCounterLock().notify();
                                     }
                                 }
                             }
@@ -113,7 +113,7 @@ public class HandleElection extends Thread {
                                 taxi.incrementCounter();
 
                                 if (taxi.getOkCounter() == size) {
-                                    taxi.getOkCounterLock().notifyAll();
+                                    taxi.getOkCounterLock().notify();
                                 }
                             }
                         }
@@ -179,7 +179,7 @@ public class HandleElection extends Thread {
                         }
 
                         synchronized (taxi.getOkCounterLock()) {
-                            taxi.getOkCounterLock().notifyAll();
+                            taxi.getOkCounterLock().notify();
                         }
                     } else {
                         System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + taxiToAdd.getId()
@@ -190,7 +190,7 @@ public class HandleElection extends Thread {
 
                             if (taxi.getOkCounter() == taxiIdList.size()) {
                                 System.out.println("Received all ack!");
-                                taxi.getOkCounterLock().notifyAll();
+                                taxi.getOkCounterLock().notify();
                             }
                         }
                     }
@@ -205,7 +205,7 @@ public class HandleElection extends Thread {
                         taxi.incrementCounter();
 
                         if (taxi.getOkCounter() == taxiIdList.size()) {
-                            taxi.getOkCounterLock().notifyAll();
+                            taxi.getOkCounterLock().notify();
                         }
                     }
                 }
