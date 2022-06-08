@@ -38,12 +38,6 @@ public class TaxiGrpcServer extends Thread {
     }
 
     public void stopMeGently() {
-        try {
-            server.awaitTermination(10, TimeUnit.SECONDS);
-            server.shutdownNow();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            System.exit(0);
-        }
+        server.shutdownNow();
     }
 }

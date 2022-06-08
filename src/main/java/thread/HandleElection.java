@@ -26,12 +26,15 @@ public class HandleElection extends Thread {
 
     private final List<Integer> taxiIdList;
 
+    private final List<ManagedChannel> channels;
+
     private final ElectionRequestMessage electionRequest;
 
     public HandleElection(Taxi taxi, RideRequest request) {
         this.taxi = taxi;
         this.request = request;
         this.taxiIdList = new ArrayList<>();
+        this.channels = new ArrayList<>();
         RideRequestMessage rideRequest = RideRequestMessage.newBuilder()
                 .setId(request.getId())
                 .setStartX(request.getStartPos().getX())
@@ -87,7 +90,7 @@ public class HandleElection extends Thread {
                                 }
 
                                 synchronized (taxi.getOkCounterLock()) {
-                                    taxi.getOkCounterLock().notify();
+                                    taxi.getOkCounterLock().notifyAll();
                                 }
                             } else {
                                 System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + t.getId()
@@ -98,7 +101,7 @@ public class HandleElection extends Thread {
 
                                     if (taxi.getOkCounter() == size) {
                                         System.out.println("Received all ack!");
-                                        taxi.getOkCounterLock().notify();
+                                        taxi.getOkCounterLock().notifyAll();
                                     }
                                 }
                             }
@@ -113,7 +116,7 @@ public class HandleElection extends Thread {
                                 taxi.incrementCounter();
 
                                 if (taxi.getOkCounter() == size) {
-                                    taxi.getOkCounterLock().notify();
+                                    taxi.getOkCounterLock().notifyAll();
                                 }
                             }
                         }
@@ -151,6 +154,14 @@ public class HandleElection extends Thread {
                 taxi.setState(TaxiState.FREE);
             }
         }
+
+        if (!channels.isEmpty()) {
+            channels.forEach(c -> {
+                if (!c.isShutdown()) {
+                    c.shutdownNow();
+                }
+            });
+        }
     }
 
     public void addTaxi(int addTaxiId) {
@@ -162,6 +173,7 @@ public class HandleElection extends Thread {
         if (taxiToAdd != null) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(taxiToAdd.getIp() + ":" + taxiToAdd.getPort()).usePlaintext().build();
+            channels.add(channel);
             System.out.println("Taxi " + taxi.getId() + " send election to taxi " + addTaxiId + " about " +
                     "request " + request.getId());
             TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
@@ -179,7 +191,7 @@ public class HandleElection extends Thread {
                         }
 
                         synchronized (taxi.getOkCounterLock()) {
-                            taxi.getOkCounterLock().notify();
+                            taxi.getOkCounterLock().notifyAll();
                         }
                     } else {
                         System.out.println("Taxi " + taxi.getId() + " received ok from Taxi " + taxiToAdd.getId()
@@ -190,7 +202,7 @@ public class HandleElection extends Thread {
 
                             if (taxi.getOkCounter() == taxiIdList.size()) {
                                 System.out.println("Received all ack!");
-                                taxi.getOkCounterLock().notify();
+                                taxi.getOkCounterLock().notifyAll();
                             }
                         }
                     }
@@ -205,7 +217,7 @@ public class HandleElection extends Thread {
                         taxi.incrementCounter();
 
                         if (taxi.getOkCounter() == taxiIdList.size()) {
-                            taxi.getOkCounterLock().notify();
+                            taxi.getOkCounterLock().notifyAll();
                         }
                     }
                 }

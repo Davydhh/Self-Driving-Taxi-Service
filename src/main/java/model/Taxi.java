@@ -27,6 +27,7 @@ import java.net.URL;
 import java.util.List;
 import java.util.Queue;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 @XmlRootElement
 public class Taxi {
@@ -677,38 +678,87 @@ public class Taxi {
     }
 
     private void notifyOtherTaxisForJoining() {
+        List<ManagedChannel> channels = new ArrayList<>();
+
         for (TaxiBean t: getOtherTaxis()) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            TaxiServiceGrpc.TaxiServiceBlockingStub stub = TaxiServiceGrpc.newBlockingStub(channel);
+            channels.add(channel);
+            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
                     seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
 
-            seta.proto.taxi.Taxi.AddTaxiResponseMessage response = stub.addTaxi(message);
+            stub.addTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.AddTaxiResponseMessage>() {
+                @Override
+                public void onNext(seta.proto.taxi.Taxi.AddTaxiResponseMessage value) {
+                    if (value.getAdded()) {
+                        System.out.println("Taxi " + t.getId() + " correctly updated for joining");
+                    } else {
+                        System.out.println("Taxi " + t.getId() + " have been not correctly " +
+                                "updated for joining");
+                    }
+                }
 
-            if (response.getAdded()) {
-                System.out.println("Taxi " + t.getId() + " correctly updated for joining");
-            } else {
-                System.out.println("Taxi " + t.getId() + " have been not correctly " +
-                        "updated for joining");
+                @Override
+                public void onError(Throwable t) {
+                    t.printStackTrace();
+                }
+
+                @Override
+                public void onCompleted() {
+                    channel.shutdownNow();
+                }
+            });
+        }
+
+        for (ManagedChannel c: channels) {
+            try {
+                c.awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
     }
 
     private void notifyOtherTaxisForLeaving() {
+        List<ManagedChannel> channels = new ArrayList<>();
+
         for (TaxiBean t: getOtherTaxis()) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
-            TaxiServiceGrpc.TaxiServiceBlockingStub stub = TaxiServiceGrpc.newBlockingStub(channel);
+            channels.add(channel);
+            TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
             seta.proto.taxi.Taxi.TaxiMessage message =
                     seta.proto.taxi.Taxi.TaxiMessage.newBuilder().setId(id).setIp(ip).setPort(port).setStartX(startPos.getX()).setStartY(startPos.getY()).build();
-            seta.proto.taxi.Taxi.RemoveTaxiResponseMessage response = stub.removeTaxi(message);
+            stub.removeTaxi(message, new StreamObserver<seta.proto.taxi.Taxi.RemoveTaxiResponseMessage>() {
+                @Override
+                public void onNext(seta.proto.taxi.Taxi.RemoveTaxiResponseMessage value) {
+                    if (value.getRemoved()) {
+                        System.out.println("Taxi " + t.getId() + " correctly updated for leaving");
+                        channel.shutdownNow();
+                    } else {
+                        System.out.println("Taxi " + t.getId() + " have been not correctly " +
+                                "updated for leaving");
+                    }
+                }
 
-            if (response.getRemoved()) {
-                System.out.println("Taxi " + t.getId() + " correctly updated for leaving");
-            } else {
-                System.out.println("Taxi " + t.getId() + " have been not correctly " +
-                        "updated for leaving");
+                @Override
+                public void onError(Throwable t) {
+                    t.printStackTrace();
+                }
+
+                @Override
+                public void onCompleted() {
+                    channel.shutdownNow();
+                }
+            });
+        }
+
+        for (ManagedChannel c: channels) {
+            try {
+                c.awaitTermination(10, TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             }
         }
     }
@@ -848,7 +898,7 @@ public class Taxi {
             while (taxi.getState() != TaxiState.FREE && taxi.getState() != TaxiState.LEAVING) {
                 if (taxi.getState() == TaxiState.HANDLING_RIDE) {
                     synchronized (taxi.getOkCounterLock()) {
-                        taxi.getOkCounterLock().notify();
+                        taxi.getOkCounterLock().notifyAll();
                     }
                 }
 
