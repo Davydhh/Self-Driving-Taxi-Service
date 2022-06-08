@@ -343,12 +343,6 @@ public class Taxi {
         }
     }
 
-    public void removeHandledRequest(RideRequest request) {
-        synchronized (requestsHandled) {
-            requestsHandled.remove(request);
-        }
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -377,12 +371,14 @@ public class Taxi {
     public void addTaxi(TaxiBean taxi) {
         synchronized (otherTaxisLock) {
             otherTaxis.add(taxi);
+            System.out.println("Taxi " + taxi.getId() + " added");
         }
     }
 
     public void removeTaxi(TaxiBean taxi) {
         synchronized (otherTaxisLock) {
             otherTaxis.remove(taxi);
+            System.out.println("Taxi " + taxi.getId() + " removed");
         }
     }
 
@@ -570,7 +566,6 @@ public class Taxi {
 
                 if (topic.equals("seta/smartcity/rides/removed")) {
                     removeRequest(rideRequest);
-                    removeHandledRequest(rideRequest);
                 } else {
                     System.out.println("--------------------------------");
                     System.out.println("Taxi " + id + " received a Message!" +

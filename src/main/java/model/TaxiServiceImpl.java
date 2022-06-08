@@ -53,7 +53,14 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                 "Taxi " + requestTaxiId + " about request " + requestId);
 
         synchronized (taxi.getStateLock()) {
-            if (!taxi.getTopic().equals(Utils.getDistrictTopicFromPosition(
+            if (taxi.getRequestsHandled().contains(new RideRequest(rideRequest.getId(),
+                    new Point((int) rideRequest.getStartX(),
+                            (int) rideRequest.getStartY()),
+                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())))) {
+                System.out.println("Request " + requestId + " already handled");
+
+                sendResponse(false, responseObserver);
+            } else if (!taxi.getTopic().equals(Utils.getDistrictTopicFromPosition(
                     new Point((int) rideRequest.getStartX(), (int) rideRequest.getStartY())))) {
                 System.out.println("Taxi " + taxiId + " has received request " + requestId +
                         " from Taxi " + requestTaxiId + " that is from another district");
@@ -81,13 +88,6 @@ public class TaxiServiceImpl extends TaxiServiceImplBase {
                 sendResponse(true, responseObserver);
             } else if (taxi.getState() == TaxiState.BUSY && taxi.getRequestId() == requestId) {
                 System.out.println("Taxi " + taxiId + " is already driving for request " + taxi.getRequestId());
-
-                sendResponse(false, responseObserver);
-            } else if (taxi.getRequestsHandled().contains(new RideRequest(rideRequest.getId(),
-                    new Point((int) rideRequest.getStartX(),
-                            (int) rideRequest.getStartY()),
-                    new Point((int) rideRequest.getEndX(), (int) rideRequest.getEndY())))) {
-                System.out.println("Request " + requestId + " already handled");
 
                 sendResponse(false, responseObserver);
             } else {
