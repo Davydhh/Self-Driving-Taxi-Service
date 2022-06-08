@@ -160,15 +160,6 @@ public class HandleElection extends Thread {
                 taxi.setState(TaxiState.FREE);
             }
         }
-
-        // Shutdown remaining channels since election is finished
-        if (!channels.isEmpty()) {
-            channels.forEach(c -> {
-                if (!c.isShutdown()) {
-                    c.shutdownNow();
-                }
-            });
-        }
     }
 
     public void addTaxi(int addTaxiId) {
