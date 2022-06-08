@@ -30,7 +30,7 @@ public class TaxiGrpcServer extends Thread {
             server.start();
             System.out.println("Taxi " + taxi.getId() + " server started on port " + taxi.getPort());
 
-            server.awaitTermination(10, TimeUnit.SECONDS);
+            server.awaitTermination();
         } catch (IOException | InterruptedException e) {
             e.printStackTrace();
             System.exit(0);
@@ -44,12 +44,12 @@ public class TaxiGrpcServer extends Thread {
          if (electionThread != null) {
              electionThread.getChannels().forEach(c -> {
                  if (!c.isShutdown()) {
+                     c.shutdownNow();
                      try {
                          c.awaitTermination(10, TimeUnit.SECONDS);
                      } catch (InterruptedException e) {
                          e.printStackTrace();
                      }
-                     c.shutdownNow();
                  }
              });
          }

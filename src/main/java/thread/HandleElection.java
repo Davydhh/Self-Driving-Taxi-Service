@@ -14,6 +14,7 @@ import seta.proto.taxi.TaxiServiceGrpc;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static model.TaxiState.HANDLING_RIDE;
@@ -165,6 +166,11 @@ public class HandleElection extends Thread {
             channels.forEach(c -> {
                 if (!c.isShutdown()) {
                     c.shutdownNow();
+                    try {
+                        c.awaitTermination(10, TimeUnit.SECONDS);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                 }
             });
         }
