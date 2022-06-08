@@ -39,5 +39,19 @@ public class TaxiGrpcServer extends Thread {
 
     public void stopMeGently() {
         server.shutdownNow();
+
+        HandleElection electionThread = taxi.getElectionThread();
+         if (electionThread != null) {
+             electionThread.getChannels().forEach(c -> {
+                 if (!c.isShutdown()) {
+                     try {
+                         c.awaitTermination(10, TimeUnit.SECONDS);
+                     } catch (InterruptedException e) {
+                         e.printStackTrace();
+                     }
+                     c.shutdownNow();
+                 }
+             });
+         }
     }
 }

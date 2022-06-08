@@ -54,6 +54,12 @@ public class HandleElection extends Thread {
         return taxiIdList;
     }
 
+    public List<ManagedChannel> getChannels() {
+        synchronized (channels) {
+            return channels;
+        }
+    }
+
     @Override
     public void run() {
         System.out.println("Starting election for request " + request.getId());
@@ -74,6 +80,9 @@ public class HandleElection extends Thread {
                 for (TaxiBean t : taxiList) {
                     final ManagedChannel channel =
                             ManagedChannelBuilder.forTarget(t.getIp() + ":" + t.getPort()).usePlaintext().build();
+                    synchronized (channels) {
+                        channels.add(channel);
+                    }
                     System.out.println("Taxi " + taxi.getId() + " send election to taxi " + t.getId() + " about request " + request.getId());
                     TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
 
@@ -173,7 +182,9 @@ public class HandleElection extends Thread {
         if (taxiToAdd != null) {
             final ManagedChannel channel =
                     ManagedChannelBuilder.forTarget(taxiToAdd.getIp() + ":" + taxiToAdd.getPort()).usePlaintext().build();
-            channels.add(channel);
+            synchronized (channels) {
+                channels.add(channel);
+            }
             System.out.println("Taxi " + taxi.getId() + " send election to taxi " + addTaxiId + " about " +
                     "request " + request.getId());
             TaxiServiceGrpc.TaxiServiceStub stub = TaxiServiceGrpc.newStub(channel);
